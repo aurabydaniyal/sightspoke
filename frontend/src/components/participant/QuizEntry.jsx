@@ -4,9 +4,11 @@ import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowRight, faClock, faImage } from '@fortawesome/free-solid-svg-icons';
 import { participantApi } from '../../api/axiosConfig';
-import toast from 'react-hot-toast';
+import { useAlert } from '../../components/common/CustomAlert';
+import ParticipantChat from '../ai/ParticipantChat';
 
 const QuizEntry = () => {
+  const { error } = useAlert();
   const { token } = useParams();
   const navigate = useNavigate();
   const [quizInfo, setQuizInfo] = useState(null);
@@ -19,10 +21,11 @@ const QuizEntry = () => {
   const validateToken = async () => {
     try {
       const response = await participantApi.get(`/validate/${token}`);
+      console.log('✅ Quiz info from backend:', response.data); // ✅ Debug
       setQuizInfo(response.data);
       setLoading(false);
-    } catch (error) {
-      toast.error('Invalid or expired link');
+    } catch (err) {
+      error('Invalid or expired link');
       setLoading(false);
     }
   };
@@ -91,6 +94,15 @@ const QuizEntry = () => {
           Your responses are anonymous. No personal data is collected.
         </p>
       </motion.div>
+
+      {/* ✅ Pass quizId correctly */}
+      <ParticipantChat
+        quizId={quizInfo?.quiz_id || null}
+        participantTokenId={token}
+        quizTitle={quizInfo?.title}
+        quizDescription={quizInfo?.description}
+        aiOverview={quizInfo?.ai_overview}
+      />
     </div>
   );
 };

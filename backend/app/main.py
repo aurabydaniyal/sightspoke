@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
-# Import routes
 from api.routes import admin, participant
+from ai.router import router as ai_router  # ✅ MUST BE IMPORTED
 from config import settings
 from database import test_connection
 
@@ -17,18 +17,13 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Static files for images
+# Static files
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
@@ -41,12 +36,12 @@ async def root():
 async def health():
     return {"status": "healthy"}
 
-# Include routers
+# ✅ INCLUDE ROUTERS - Make sure AI router is included
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(participant.router, prefix="/api/participant", tags=["Participant"])
+app.include_router(ai_router, prefix="/api/admin/ai", tags=["AI"])  # ✅ THIS IS THE FIX
 
-# On startup
 @app.on_event("startup")
 async def startup_event():
-    print("ðŸš€ Starting SightSpoke API...")
+    print("🚀 Starting SightSpoke API...")
     test_connection()

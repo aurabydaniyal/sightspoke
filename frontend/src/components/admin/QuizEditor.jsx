@@ -8,11 +8,13 @@ import {
   faSpinner
 } from '@fortawesome/free-solid-svg-icons';
 import { adminApi } from '../../api/axiosConfig';
-import toast from 'react-hot-toast';
+import { useAlert } from '../common/CustomAlert';
 
 const QuizEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { success, error, warning, info, confirm } = useAlert();
+  
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [quiz, setQuiz] = useState(null);
@@ -27,6 +29,17 @@ const QuizEditor = () => {
     is_published: false
   });
 
+  useEffect(() => {
+    console.log('📌 Quiz ID from URL:', id);
+    if (id && id !== 'create' && id !== 'undefined') {
+      loadQuiz();
+    } else {
+      setIsNewQuiz(true);
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
   const loadQuiz = async () => {
     setLoading(true);
     try {
@@ -39,37 +52,29 @@ const QuizEditor = () => {
       setPages(pagesRes.data);
       setAllImages(imagesRes.data);
       setIsNewQuiz(false);
-    } catch (error) {
-      toast.error('Failed to load quiz');
+    } catch (err) {
+      console.error('❌ Load quiz error:', err);
+      error('Failed to load quiz');
       navigate('/admin/quizzes');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (id && id !== 'create' && id !== 'undefined') {
-      loadQuiz();
-    } else {
-      setIsNewQuiz(true);
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
   const createNewQuiz = async () => {
     if (!newQuizData.title.trim()) {
-      toast.error('Please enter a quiz title');
+      warning('Please enter a quiz title');
       return;
     }
     setSaving(true);
     try {
       const response = await adminApi.post('/quizzes', newQuizData);
-      toast.success('Quiz created!');
+      success('Quiz created!');
       navigate(`/admin/quizzes/${response.data.id}/edit`);
       window.location.reload();
-    } catch (error) {
-      toast.error('Failed to create quiz');
+    } catch (err) {
+      console.error('❌ Create quiz error:', err);
+      error('Failed to create quiz');
     } finally {
       setSaving(false);
     }
@@ -77,7 +82,7 @@ const QuizEditor = () => {
 
   const addPage = async () => {
     if (!id || id === 'create' || id === 'undefined') {
-      toast.error('Please save the quiz first before adding pages');
+      warning('Please save the quiz first before adding pages');
       return;
     }
     try {
@@ -88,31 +93,70 @@ const QuizEditor = () => {
       });
       setPages([...pages, response.data]);
       setCurrentPageIndex(pages.length);
-      toast.success('Page added!');
-    } catch (error) {
-      toast.error('Failed to add page');
+      success('Page added!');
+    } catch (err) {
+      console.error('❌ Add page error:', err);
+      error('Failed to add page');
     }
   };
 
   const deletePage = async (pageId) => {
-    if (!window.confirm('Delete this page?')) return;
+    const confirmed = await confirm('Delete this page?', 'Delete Page');
+    if (!confirmed) return;
     try {
       await adminApi.delete(`/quizzes/${id}/pages/${pageId}`);
       setPages(pages.filter(p => p.id !== pageId));
-      toast.success('Page deleted');
-    } catch (error) {
-      toast.error('Failed to delete page');
+      success('Page deleted');
+    } catch (err) {
+      console.error('❌ Delete page error:', err);
+      error('Failed to delete page');
     }
   };
 
+  // ✅ FIXED: updatePage with proper NaN handling
   const updatePage = async (pageId, data) => {
     try {
-      await adminApi.put(`/quizzes/${id}/pages/${pageId}`, data);
+      // ✅ Handle empty values properly - prevent NaN
+      const pageNumber = data.page_number !== undefined && data.page_number !== '' 
+        ? parseInt(data.page_number, 10) 
+        : 1;
+        
+      const timeLimit = data.time_limit_seconds !== undefined && data.time_limit_seconds !== '' 
+        ? parseInt(data.time_limit_seconds, 10) 
+        : 10;
+        
+      const layoutId = data.layout_template_id !== undefined && data.layout_template_id !== '' 
+        ? parseInt(data.layout_template_id, 10) 
+        : null;
+      
+      // ✅ Validate numbers
+      if (isNaN(pageNumber) || pageNumber < 1) {
+        warning('Page number must be at least 1');
+        return;
+      }
+      if (isNaN(timeLimit) || timeLimit < 3 || timeLimit > 60) {
+        warning('Time limit must be between 3 and 60 seconds');
+        return;
+      }
+      
+      const payload = {
+        page_number: pageNumber,
+        time_limit_seconds: timeLimit,
+        layout_template_id: layoutId
+      };
+      
+      console.log('📤 Updating page with payload:', payload);
+      
+      const response = await adminApi.put(`/quizzes/${id}/pages/${pageId}`, payload);
+      console.log('✅ Update response:', response.data);
+      
       const updated = pages.map(p => p.id === pageId ? { ...p, ...data } : p);
       setPages(updated);
-      toast.success('Page updated!');
-    } catch (error) {
-      toast.error('Failed to update page');
+      success('Page updated!');
+    } catch (err) {
+      console.error('❌ Update error:', err);
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to update page';
+      error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
     }
   };
 
@@ -123,9 +167,10 @@ const QuizEditor = () => {
         position_index: 0
       });
       await loadQuiz();
-      toast.success('Image added to page!');
-    } catch (error) {
-      toast.error('Failed to add image');
+      success('Image added to page!');
+    } catch (err) {
+      console.error('❌ Add image error:', err);
+      error('Failed to add image');
     }
   };
 
@@ -133,9 +178,10 @@ const QuizEditor = () => {
     try {
       await adminApi.delete(`/pages/${pageId}/images/${imageId}`);
       await loadQuiz();
-      toast.success('Image removed');
-    } catch (error) {
-      toast.error('Failed to remove image');
+      success('Image removed');
+    } catch (err) {
+      console.error('❌ Remove image error:', err);
+      error('Failed to remove image');
     }
   };
 
@@ -220,7 +266,7 @@ const QuizEditor = () => {
         </button>
       </div>
 
-      {/* ✅ PAGE LIST WITH IMAGE COUNT - FIXED */}
+      {/* Page List with Image Count */}
       <div className="flex flex-wrap gap-2 pb-4">
         {pages.map((page, index) => {
           const imageCount = page.page_images?.length || 0;
@@ -270,7 +316,7 @@ const QuizEditor = () => {
               <input
                 type="number"
                 value={currentPage.page_number}
-                onChange={(e) => updatePage(currentPage.id, { page_number: parseInt(e.target.value) })}
+                onChange={(e) => updatePage(currentPage.id, { page_number: e.target.value })}
                 className="input-modern mt-1"
                 min="1"
               />
@@ -280,7 +326,7 @@ const QuizEditor = () => {
               <input
                 type="number"
                 value={currentPage.time_limit_seconds}
-                onChange={(e) => updatePage(currentPage.id, { time_limit_seconds: parseInt(e.target.value) })}
+                onChange={(e) => updatePage(currentPage.id, { time_limit_seconds: e.target.value })}
                 className="input-modern mt-1"
                 min="3"
                 max="60"
@@ -290,7 +336,7 @@ const QuizEditor = () => {
               <label className="text-sm font-medium text-[#1A312C]/60"><FontAwesomeIcon icon={faTable} className="mr-1" /> Layout</label>
               <select
                 value={currentPage.layout_template_id || 1}
-                onChange={(e) => updatePage(currentPage.id, { layout_template_id: parseInt(e.target.value) })}
+                onChange={(e) => updatePage(currentPage.id, { layout_template_id: e.target.value })}
                 className="input-modern mt-1"
               >
                 {layoutOptions.map(opt => (

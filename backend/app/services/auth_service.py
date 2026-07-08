@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone  # ← Add timezone
+from datetime import datetime, timezone  # â† Add timezone
 from models import AdminUser
 from core.security import verify_password, create_access_token, get_password_hash
 from schemas.admin import TokenResponse
@@ -16,7 +16,7 @@ def authenticate_admin(db: Session, username: str, password: str) -> AdminUser:
     if not verify_password(password, admin.password_hash):
         return None
     
-    admin.last_login = datetime.now(timezone.utc)  # ← FIXED
+    admin.last_login = datetime.now(timezone.utc)  # â† FIXED
     db.commit()
     db.refresh(admin)
     return admin

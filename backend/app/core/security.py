@@ -10,7 +10,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password using SHA256"""
     # DEBUG: Print everything
     print("=" * 50)
-    print("🔍 DEBUG - verify_password called")
+    print("ðŸ” DEBUG - verify_password called")
     print(f"Input password: '{plain_password}'")
     print(f"Stored hash: '{hashed_password}'")
     

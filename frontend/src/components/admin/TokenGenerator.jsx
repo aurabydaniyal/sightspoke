@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom'; // ✅ ADD THIS
+import { useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLink, faCopy, faCheck, faSync, faPlus, faMinus } from '@fortawesome/free-solid-svg-icons';
 import { adminApi } from '../../api/axiosConfig';
-import toast from 'react-hot-toast';
+import { useAlert } from '../../components/common/CustomAlert';
 
 const TokenGenerator = () => {
-  // ✅ Get quizId from URL params
+  const { success, error, warning } = useAlert();
   const { id } = useParams();
   const quizId = id;
 
@@ -16,22 +16,31 @@ const TokenGenerator = () => {
   const [loading, setLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
 
-  const generateTokens = async () => {
-    if (!quizId || quizId === 'undefined') {
-      toast.error('Invalid quiz ID. Please go back and try again.');
-      return;
-    }
+  if (!quizId || quizId === 'undefined' || quizId === 'create') {
+    return (
+      <div className="glass-card p-8 text-center">
+        <p className="text-[#1A312C]/60">Please select a valid quiz first.</p>
+        <button 
+          onClick={() => window.location.href = '/admin/quizzes'} 
+          className="btn-neon mt-4"
+        >
+          Go to Quizzes
+        </button>
+      </div>
+    );
+  }
 
+  const generateTokens = async () => {
     setLoading(true);
     try {
       const response = await adminApi.post(`/quizzes/${quizId}/tokens`, null, {
         params: { count, expiry_days: expiryDays }
       });
       setTokens(response.data.links);
-      toast.success(`${count} tokens generated!`);
+      success(`${count} tokens generated!`);
     } catch (error) {
-      toast.error('Failed to generate tokens');
-      console.error('Error:', error.response?.data || error.message);
+      error('Failed to generate tokens');
+      console.error('Token error:', error.response?.data || error.message);
     } finally {
       setLoading(false);
     }
@@ -41,13 +50,13 @@ const TokenGenerator = () => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
-    toast.success('Copied!');
+    success('Copied!');
   };
 
   const copyAll = () => {
     const all = tokens.map(t => t.url).join('\n');
     navigator.clipboard.writeText(all);
-    toast.success('All links copied!');
+    success('All links copied!');
   };
 
   const handleCountChange = (delta) => {
@@ -64,20 +73,6 @@ const TokenGenerator = () => {
     }
   };
 
-  if (!quizId || quizId === 'undefined') {
-    return (
-      <div className="glass-card p-8 text-center">
-        <p className="text-[#1A312C]/60">Please select a valid quiz first.</p>
-        <button 
-          onClick={() => window.location.href = '/admin/quizzes'} 
-          className="btn-neon mt-4"
-        >
-          Go to Quizzes
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 mb-4">
@@ -87,7 +82,6 @@ const TokenGenerator = () => {
 
       <div className="glass-card p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {/* Count */}
           <div>
             <label className="text-sm font-medium text-[#1A312C]/60">Number of Tokens</label>
             <div className="flex items-center gap-2 mt-1">
@@ -114,7 +108,6 @@ const TokenGenerator = () => {
             </div>
           </div>
 
-          {/* Expiry */}
           <div>
             <label className="text-sm font-medium text-[#1A312C]/60">Expiry (Days)</label>
             <div className="flex items-center gap-2 mt-1">
@@ -152,7 +145,6 @@ const TokenGenerator = () => {
         </button>
       </div>
 
-      {/* Tokens List */}
       {tokens.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-4">

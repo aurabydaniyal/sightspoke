@@ -3,6 +3,8 @@ from .quiz import Quiz, QuizPage, LayoutTemplate, PageImage
 from .image import Image
 from .token import ParticipantToken
 from .response import Response
+from .ai_insight import AIInsight
+from .participant_chat_log import ParticipantChatLog
 
 __all__ = [
     "AdminUser",
@@ -12,5 +14,7 @@ __all__ = [
     "PageImage",
     "Image",
     "ParticipantToken",
-    "Response"
+    "Response",
+    "AIInsight",
+    "ParticipantChatLog"
 ]

@@ -13,7 +13,8 @@ import {
   faUser, 
   faSignOutAlt,
   faBars,
-  faTimes
+  faTimes,
+  faBrain  // ✅ ADD THIS
 } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../../context/AuthContext';
 
@@ -29,10 +30,11 @@ const Sidebar = ({ children }) => {
     { path: '/admin/images', icon: faImages, label: 'Images' },
     { path: '/admin/tokens', icon: faLink, label: 'Tokens' },
     { path: '/admin/export', icon: faDownload, label: 'Export' },
+    { path: '/admin/ai', icon: faBrain, label: 'AI Insights' },  // ✅ ADD THIS
     { path: '/admin/settings', icon: faCog, label: 'Settings' },
   ];
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path);
 
   const handleLogout = () => {
     logout();

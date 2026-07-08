@@ -30,6 +30,8 @@ class ImageBase(BaseModel):
     file_path: str
     file_size: Optional[int]
     mime_type: str
+    title: Optional[str] = ""  # ✅ ADD THIS
+    description: Optional[str] = ""  # ✅ ADD THIS
     img_metadata: Optional[dict] = {}
 
 class ImageResponse(ImageBase):
@@ -41,7 +43,7 @@ class ImageResponse(ImageBase):
         from_attributes = True
 
 # ============================================================
-# PAGE IMAGE SCHEMA (NEW)
+# PAGE IMAGE SCHEMA
 # ============================================================
 
 class PageImageSummary(BaseModel):
@@ -50,7 +52,7 @@ class PageImageSummary(BaseModel):
     image_id: UUID
     display_order: int
     position_index: Optional[int]
-    image: Optional[ImageResponse]  # ✅ Nested image data
+    image: Optional[ImageResponse]
 
     class Config:
         from_attributes = True
@@ -73,19 +75,20 @@ class QuizPageResponse(QuizPageBase):
     created_at: datetime
     updated_at: datetime
     layout: Optional[LayoutTemplateResponse]
-    page_images: Optional[List[PageImageSummary]] = []  # ✅ ADD THIS LINE
+    page_images: Optional[List[PageImageSummary]] = []
 
     class Config:
         from_attributes = True
 
 # ============================================================
-# QUIZ SCHEMAS
+# QUIZ SCHEMAS - ✅ FIXED: Added ai_overview
 # ============================================================
 
 class QuizBase(BaseModel):
     title: str
     description: Optional[str]
     is_published: bool = False
+    ai_overview: Optional[str] = ""  # ✅ ADD THIS
 
 class QuizCreate(QuizBase):
     pass

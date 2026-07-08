@@ -26,8 +26,8 @@ def test_connection() -> bool:
         db = SessionLocal()
         db.execute("SELECT 1")
         db.close()
-        print("âœ… Database connected successfully!")
+        print("Ã¢Å“â€¦ Database connected successfully!")
         return True
     except Exception as e:
-        print(f"âŒ Database connection failed: {e}")
+        print(f"Ã¢ÂÅ’ Database connection failed: {e}")
         return False

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { participantApi } from '../../api/axiosConfig';
+import { useAlert } from '../../components/common/CustomAlert';
 import toast from 'react-hot-toast';
 
 const QuizPage = () => {
+  const { error } = useAlert();
   const { token, pageNumber } = useParams();
   const navigate = useNavigate();
   const [pageData, setPageData] = useState(null);
@@ -23,7 +25,7 @@ const QuizPage = () => {
       setSelectedImage(null);
       setSubmitting(false);
     } catch (error) {
-      toast.error('Failed to load page');
+      error('Failed to load page');
       navigate(`/quiz/${token}/complete`);
     }
   };
@@ -55,7 +57,7 @@ const QuizPage = () => {
         navigate(`/quiz/${token}/page/${parseInt(pageNumber) + 1}`);
       }
     } catch (error) {
-      toast.error('Failed to submit response');
+      error('Failed to submit response');
       setSubmitting(false);
       setSubmitted(false);
     }
@@ -70,7 +72,6 @@ const QuizPage = () => {
 
   useEffect(() => {
     loadPage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageNumber]);
 
   useEffect(() => {
@@ -89,7 +90,6 @@ const QuizPage = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageData, pageNumber]);
 
   if (!pageData) {
@@ -110,7 +110,6 @@ const QuizPage = () => {
   return (
     <div className="min-h-screen bg-[#1A312C] flex items-center justify-center p-4">
       <div className="glass-card p-6 md:p-8 max-w-3xl w-full">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <span className="text-sm text-[#1A312C]/60">
             Page {pageNumber} of {pageData.total_pages}
@@ -125,7 +124,6 @@ const QuizPage = () => {
           </div>
         </div>
 
-        {/* Image Grid */}
         <div className={`grid ${layoutClass} gap-4 mb-6`}>
           {pageData.images.map((image, index) => (
             <motion.button
@@ -159,7 +157,6 @@ const QuizPage = () => {
           ))}
         </div>
 
-        {/* Progress Dots */}
         <div className="flex items-center justify-center gap-2">
           {Array.from({ length: pageData.total_pages }, (_, i) => (
             <div

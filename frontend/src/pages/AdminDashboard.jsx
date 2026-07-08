@@ -229,7 +229,7 @@ const AdminDashboard = () => {
           <h1 className="text-3xl font-bold text-[#1A312C]">Dashboard</h1>
           <p className="text-[#1A312C]/60">Overview of your SightSpoke platform</p>
         </div>
-        <button onClick={() => navigate('/admin/quizzes/create')} className="btn-neon">
+        <button onClick={() => navigate('/admin/quizzes')} className="btn-neon">
           <FontAwesomeIcon icon={faPlus} /> New Quiz
         </button>
       </div>

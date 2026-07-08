@@ -17,6 +17,7 @@ class LayoutTemplate(Base):
 
     pages = relationship("QuizPage", back_populates="layout")
 
+
 class Quiz(Base):
     __tablename__ = "quizzes"
 
@@ -26,13 +27,18 @@ class Quiz(Base):
     description = Column(Text, nullable=True)
     is_published = Column(Boolean, default=False)
     version = Column(Integer, default=1)
+    ai_overview = Column(Text, nullable=True, default="")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    # Relationships
     admin = relationship("AdminUser", backref="quizzes")
     pages = relationship("QuizPage", back_populates="quiz", cascade="all, delete-orphan")
     tokens = relationship("ParticipantToken", back_populates="quiz", cascade="all, delete-orphan")
     responses = relationship("Response", back_populates="quiz", cascade="all, delete-orphan")
+    ai_insights = relationship("AIInsight", back_populates="quiz", cascade="all, delete-orphan")
+    chat_logs = relationship("ParticipantChatLog", back_populates="quiz", cascade="all, delete-orphan")
+
 
 class QuizPage(Base):
     __tablename__ = "quiz_pages"
@@ -51,6 +57,7 @@ class QuizPage(Base):
     responses = relationship("Response", back_populates="page", cascade="all, delete-orphan")
 
     __table_args__ = (UniqueConstraint('quiz_id', 'page_number'),)
+
 
 class PageImage(Base):
     __tablename__ = "page_images"

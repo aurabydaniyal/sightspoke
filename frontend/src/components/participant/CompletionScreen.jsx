@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faHome } from '@fortawesome/free-solid-svg-icons';
-import { useNavigate } from 'react-router-dom';
+import { faCheck, faHome, faRobot, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { useNavigate, useParams } from 'react-router-dom';
 
 const FireworkParticle = ({ delay, x, y, color }) => {
   const [particles, setParticles] = useState([]);
@@ -58,7 +58,9 @@ const FireworkParticle = ({ delay, x, y, color }) => {
 
 const CompletionScreen = () => {
   const navigate = useNavigate();
+  const { token } = useParams();
   const [showFireworks, setShowFireworks] = useState(true);
+  const [showPopup, setShowPopup] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowFireworks(false), 4000);
@@ -90,7 +92,6 @@ const CompletionScreen = () => {
         transition={{ delay: 0.5 }}
         className="glass-card p-8 md:p-12 max-w-md w-full text-center relative z-10"
       >
-        {/* Success Icon */}
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -114,6 +115,85 @@ const CompletionScreen = () => {
           </button>
         </div>
       </motion.div>
+
+      {/* ✅ Custom Chat Button - Shows Popup Instead of Chat Window */}
+      <button
+        onClick={() => setShowPopup(true)}
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full 
+                   bg-[#428475] text-[#FFF4E1] shadow-lg shadow-[#428475]/30 
+                   flex items-center justify-center
+                   hover:bg-[#89D7B7] hover:text-[#1A312C] transition-all duration-300"
+      >
+        <FontAwesomeIcon icon={faRobot} className="text-2xl" />
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#89D7B7] rounded-full animate-pulse" />
+      </button>
+
+      {/* ✅ Popup Message */}
+      <AnimatePresence>
+        {showPopup && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPopup(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998]"
+            />
+
+            {/* Popup Content */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999] w-full max-w-sm"
+            >
+              <div 
+                className="glass-card p-8 text-center relative"
+                style={{
+                  background: 'rgba(26, 49, 44, 0.95)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(137, 215, 183, 0.2)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                }}
+              >
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowPopup(false)}
+                  className="absolute top-3 right-3 text-[#FFF4E1]/40 hover:text-[#FFF4E1] transition-colors"
+                >
+                  <FontAwesomeIcon icon={faTimes} className="text-lg" />
+                </button>
+
+                {/* Icon */}
+                <div className="w-16 h-16 rounded-full bg-[#89D7B7]/20 flex items-center justify-center mx-auto mb-4">
+                  <FontAwesomeIcon icon={faCheck} className="text-3xl text-[#89D7B7]" />
+                </div>
+
+                {/* Message */}
+                <h3 className="text-xl font-bold text-[#FFF4E1] mb-2">✅ Response Submitted!</h3>
+                <p className="text-[#FFF4E1]/60 text-sm">
+                  Thank you for completing the quiz. 
+                  <br />
+                  Your responses have been successfully recorded.
+                  <br />
+                  <span className="text-[#89D7B7] text-xs mt-2 block">
+                    💡 You can now close this popup.
+                  </span>
+                </p>
+
+                <button
+                  onClick={() => setShowPopup(false)}
+                  className="btn-neon w-full justify-center mt-4 !py-2.5"
+                >
+                  Got it!
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

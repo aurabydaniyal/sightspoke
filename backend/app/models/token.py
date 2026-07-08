@@ -19,3 +19,5 @@ class ParticipantToken(Base):
 
     quiz = relationship("Quiz", back_populates="tokens")
     responses = relationship("Response", back_populates="participant_token", cascade="all, delete-orphan")
+    ai_insights = relationship("AIInsight", back_populates="participant_token", cascade="all, delete-orphan")
+    chat_logs = relationship("ParticipantChatLog", back_populates="participant_token", cascade="all, delete-orphan")    

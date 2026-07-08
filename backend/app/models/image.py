@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, UUID, JSON
+from sqlalchemy import Column, String, Integer, DateTime, UUID, JSON, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -12,6 +12,8 @@ class Image(Base):
     file_path = Column(String(500), nullable=False)
     file_size = Column(Integer, nullable=True)
     mime_type = Column(String(50), nullable=False)
+    title = Column(String(255), nullable=True, default="")        # ✅ ADD THIS
+    description = Column(Text, nullable=True, default="")         # ✅ ADD THIS
     img_metadata = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -1,0 +1,36 @@
+/* Glass Alert Styles */
+.alert-glass {
+  background: rgba(26, 49, 44, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  animation: alertSlideIn 0.3s ease forwards;
+}
+
+@keyframes alertSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(50px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.alert-exit {
+  animation: alertSlideOut 0.3s ease forwards;
+}
+
+@keyframes alertSlideOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(50px) scale(0.9);
+  }
+}

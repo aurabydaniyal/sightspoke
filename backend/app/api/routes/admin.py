@@ -1,13 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File  # ← Added UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from uuid import UUID
-from typing import List
-import os  # ← Added
-import shutil  # ← Added
+from typing import List, Optional  # ✅ ADD Optional HERE
+import os
+import shutil
 
 from database import get_db
-from models import AdminUser, Quiz, QuizPage, Image, ParticipantToken, Response, PageImage  # ← Added PageImage
+from models import AdminUser, Quiz, QuizPage, Image, ParticipantToken, Response, PageImage
 from schemas import (
     QuizCreate, QuizResponse, QuizUpdate,
     QuizPageCreate, QuizPageResponse,
@@ -16,7 +16,7 @@ from schemas import (
 )
 from services.auth_service import authenticate_admin, create_admin_token
 from core.security import generate_participant_token, get_token_expiry, verify_password
-from config import settings  # ← Added
+from config import settings
 
 router = APIRouter()
 
@@ -85,7 +85,8 @@ async def create_quiz(
         admin_id=admin.id,
         title=quiz_data.title,
         description=quiz_data.description,
-        is_published=quiz_data.is_published
+        is_published=quiz_data.is_published,
+        ai_overview=quiz_data.ai_overview
     )
     db.add(quiz)
     db.commit()
@@ -289,6 +290,8 @@ async def get_all_tokens(
 @router.post("/images/upload", response_model=ImageResponse)
 async def upload_image(
     file: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     # Validate file type
@@ -298,7 +301,7 @@ async def upload_image(
             detail=f"File type not allowed. Allowed types: {settings.ALLOWED_IMAGE_TYPES}"
         )
     
-    # Create upload directory if not exists
+    # Create upload directory
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     
     # Generate unique filename
@@ -310,15 +313,16 @@ async def upload_image(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # Get file size
     file_size = os.path.getsize(file_path)
     
-    # Create image record
+    # Create image record with title and description
     image = Image(
         filename=unique_filename,
         file_path=file_path,
         file_size=file_size,
         mime_type=file.content_type,
+        title=title or "",
+        description=description or "",
         img_metadata={}
     )
     db.add(image)
@@ -363,16 +367,19 @@ async def delete_image(
     db.commit()
     return {"message": "Image deleted successfully"}
 
+
+# ============================================================
+# QUIZ INSIGHTS (Image Selection Statistics)
+# ============================================================
+
 @router.get("/quizzes/{quiz_id}/insights")
 async def get_quiz_insights(
     quiz_id: UUID,
     db: Session = Depends(get_db)
 ):
     """Get insights about image selections"""
-    # Get all responses for this quiz
     responses = db.query(Response).filter(Response.quiz_id == quiz_id).all()
     
-    # Get all images used in this quiz
     pages = db.query(QuizPage).filter(QuizPage.quiz_id == quiz_id).all()
     page_ids = [p.id for p in pages]
     
@@ -380,16 +387,33 @@ async def get_quiz_insights(
     image_ids = [pi.image_id for pi in page_images]
     images = db.query(Image).filter(Image.id.in_(image_ids)).all()
     
-    # Count selections per image
+    # ✅ Create image mapping with titles
+    image_map = {}
+    for img in images:
+        image_map[str(img.id)] = {
+            "filename": img.filename,
+            "url": f"/uploads/{img.filename}",
+            "title": img.title or img.filename,
+            "description": img.description or "",
+            "mime_type": img.mime_type
+        }
+    
+    # ✅ Count selections with image titles
     image_stats = {}
     for img in images:
         count = db.query(Response).filter(
             Response.quiz_id == quiz_id,
             Response.selected_image_id == img.id
         ).count()
-        image_stats[str(img.id)] = {
-            "filename": img.filename,
+        
+        # ✅ Use title instead of ID
+        img_id = str(img.id)
+        image_stats[img_id] = {
+            "id": img_id,
+            "title": img.title or img.filename,
+            "description": img.description or "",
             "url": f"/uploads/{img.filename}",
+            "filename": img.filename,
             "selection_count": count,
             "total_responses": len(responses),
             "percentage": round((count / len(responses) * 100) if responses else 0, 1)
@@ -398,9 +422,9 @@ async def get_quiz_insights(
     return {
         "quiz_id": str(quiz_id),
         "total_responses": len(responses),
-        "image_stats": image_stats
+        "image_stats": image_stats,
+        "image_map": image_map  # ✅ Include for reference
     }
-
 
 # ============================================================
 # PAGE IMAGES (Link images to pages)

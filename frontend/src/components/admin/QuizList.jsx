@@ -3,23 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faPlus, faEdit, faTrash, faEye, faLink, faDownload,
-  faCopy, faShare, faClock, faUsers, faChartBar
+  faPlus, faEdit, faTrash, faLink, faDownload,
+  faClock, faUsers, faInfoCircle
 } from '@fortawesome/free-solid-svg-icons';
 import { adminApi } from '../../api/axiosConfig';
-import toast from 'react-hot-toast';
+import { useAlert } from '../common/CustomAlert';
 
 const QuizList = () => {
+  const { success, error, warning, confirm } = useAlert();
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const navigate = useNavigate();
 
-  // Form state for new quiz
   const [newQuiz, setNewQuiz] = useState({
     title: '',
     description: '',
-    is_published: false
+    is_published: false,
+    ai_overview: ''
   });
 
   useEffect(() => {
@@ -31,8 +32,11 @@ const QuizList = () => {
     try {
       const response = await adminApi.get('/quizzes');
       setQuizzes(response.data);
-    } catch (error) {
-      toast.error('Failed to load quizzes');
+    } catch (err) {
+      console.error('❌ Load quizzes error:', err);
+      // ✅ Ensure error message is a string
+      const errorMsg = typeof err === 'string' ? err : err?.message || 'Failed to load quizzes';
+      error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -40,31 +44,40 @@ const QuizList = () => {
 
   const createQuiz = async () => {
     if (!newQuiz.title.trim()) {
-      toast.error('Please enter a quiz title');
+      warning('Please enter a quiz title');
       return;
     }
 
     try {
       const response = await adminApi.post('/quizzes', newQuiz);
-      toast.success('Quiz created successfully!');
+      success('Quiz created successfully!');
       setShowCreateModal(false);
-      setNewQuiz({ title: '', description: '', is_published: false });
+      setNewQuiz({ title: '', description: '', is_published: false, ai_overview: '' });
       loadQuizzes();
-      // Navigate to edit the new quiz
       navigate(`/admin/quizzes/${response.data.id}/edit`);
-    } catch (error) {
-      toast.error('Failed to create quiz');
+    } catch (err) {
+      console.error('❌ Create quiz error:', err);
+      // ✅ Ensure error message is a string
+      const errorMsg = typeof err === 'string' ? err : err?.response?.data?.detail || err?.message || 'Failed to create quiz';
+      error(errorMsg);
     }
   };
 
   const deleteQuiz = async (id, title) => {
-    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    const confirmed = await confirm(
+      `Delete "${title}"? This cannot be undone.`,
+      'Delete Quiz'
+    );
+    if (!confirmed) return;
+    
     try {
       await adminApi.delete(`/quizzes/${id}`);
-      toast.success('Quiz deleted');
+      success('Quiz deleted');
       loadQuizzes();
-    } catch (error) {
-      toast.error('Failed to delete quiz');
+    } catch (err) {
+      console.error('❌ Delete quiz error:', err);
+      const errorMsg = typeof err === 'string' ? err : err?.message || 'Failed to delete quiz';
+      error(errorMsg);
     }
   };
 
@@ -145,6 +158,12 @@ const QuizList = () => {
 
               <div className="flex flex-wrap gap-2">
                 <button
+                  onClick={() => navigate(`/admin/quizzes/${quiz.id}/details`)}
+                  className="btn-glass !py-1.5 !px-3 text-sm"
+                >
+                  <FontAwesomeIcon icon={faInfoCircle} /> Details
+                </button>
+                <button
                   onClick={() => navigate(`/admin/quizzes/${quiz.id}/edit`)}
                   className="btn-glass !py-1.5 !px-3 text-sm"
                 >
@@ -210,6 +229,22 @@ const QuizList = () => {
                   className="input-modern resize-none"
                   rows="3"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#1A312C]/60 mb-1">
+                  🤖 AI Overview (for participant chatbot)
+                </label>
+                <textarea
+                  placeholder="Describe the quiz topic for AI to stay focused..."
+                  value={newQuiz.ai_overview}
+                  onChange={(e) => setNewQuiz({ ...newQuiz, ai_overview: e.target.value })}
+                  className="input-modern resize-none"
+                  rows="2"
+                />
+                <p className="text-xs text-[#1A312C]/30 mt-1">
+                  This helps the AI chatbot stay on topic during participant conversations.
+                </p>
               </div>
 
               <div className="flex items-center gap-2">

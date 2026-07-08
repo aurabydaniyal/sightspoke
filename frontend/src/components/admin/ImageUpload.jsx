@@ -7,13 +7,20 @@ import {
   faEye, faTimes, faSpinner 
 } from '@fortawesome/free-solid-svg-icons';
 import { adminApi } from '../../api/axiosConfig';
-import toast from 'react-hot-toast';
+import { useAlert } from '../common/CustomAlert'; // ✅ Import custom alert
 
 const ImageUpload = ({ onUploadComplete }) => {
+  // ✅ Use custom alert hooks
+  const { success, error, warning, info, confirm } = useAlert();
+  
   const [uploading, setUploading] = useState(false);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [showGallery, setShowGallery] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // State for title and description
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadDescription, setUploadDescription] = useState('');
 
   // Load images on mount
   useEffect(() => {
@@ -25,8 +32,8 @@ const ImageUpload = ({ onUploadComplete }) => {
     try {
       const response = await adminApi.get('/images');
       setUploadedImages(response.data);
-    } catch (error) {
-      toast.error('Failed to load images');
+    } catch (err) {
+      error('Failed to load images'); // ✅ Custom error alert
     } finally {
       setLoading(false);
     }
@@ -38,27 +45,49 @@ const ImageUpload = ({ onUploadComplete }) => {
       const results = [];
       for (const file of acceptedFiles) {
         if (file.size > 5 * 1024 * 1024) {
-          toast.error(`${file.name} is too large (max 5MB)`);
+          error(`${file.name} is too large (max 5MB)`); // ✅ Custom error alert
           continue;
         }
         const fd = new FormData();
         fd.append('file', file);
+        fd.append('title', uploadTitle || file.name.split('.')[0]);
+        fd.append('description', uploadDescription || '');
+        
         const response = await adminApi.post('/images/upload', fd, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
         results.push(response.data);
-        toast.success(`Uploaded: ${file.name}`);
+        success(`Uploaded: ${file.name}`); // ✅ Custom success alert
       }
       
       setUploadedImages([...uploadedImages, ...results]);
+      setUploadTitle('');
+      setUploadDescription('');
       if (onUploadComplete) onUploadComplete(results);
       
-    } catch (error) {
-      toast.error('Upload failed: ' + (error.response?.data?.detail || 'Unknown error'));
+    } catch (err) {
+      error('Upload failed: ' + (err.response?.data?.detail || 'Unknown error')); // ✅ Custom error alert
     } finally {
       setUploading(false);
     }
-  }, [uploadedImages, onUploadComplete]);
+  }, [uploadedImages, onUploadComplete, uploadTitle, uploadDescription, success, error]);
+
+  const deleteImage = async (imageId) => {
+    // ✅ Custom confirm dialog instead of window.confirm
+    const confirmed = await confirm(
+      'Delete this image? This action cannot be undone.',
+      'Delete Image'
+    );
+    if (!confirmed) return;
+    
+    try {
+      await adminApi.delete(`/images/${imageId}`);
+      setUploadedImages(uploadedImages.filter(img => img.id !== imageId));
+      success('Image deleted successfully'); // ✅ Custom success alert
+    } catch (err) {
+      error('Failed to delete image'); // ✅ Custom error alert
+    }
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -70,17 +99,6 @@ const ImageUpload = ({ onUploadComplete }) => {
     maxSize: 5 * 1024 * 1024,
     multiple: true
   });
-
-  const deleteImage = async (imageId) => {
-    if (!window.confirm('Delete this image?')) return;
-    try {
-      await adminApi.delete(`/images/${imageId}`);
-      setUploadedImages(uploadedImages.filter(img => img.id !== imageId));
-      toast.success('Image deleted');
-    } catch (error) {
-      toast.error('Failed to delete image');
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -100,7 +118,7 @@ const ImageUpload = ({ onUploadComplete }) => {
       <div
         {...getRootProps()}
         className={`
-          border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-300
+          border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300
           ${isDragActive 
             ? 'border-[#89D7B7] bg-[#89D7B7]/10' 
             : 'border-[#428475]/30 hover:border-[#428475] hover:bg-[#428475]/5'
@@ -118,6 +136,38 @@ const ImageUpload = ({ onUploadComplete }) => {
         <p className="text-sm text-[#1A312C]/40 mt-2">
           or click to browse · JPG, PNG, WEBP · Max 5MB each
         </p>
+
+        {/* Title & Description Inputs */}
+        <div className="mt-4 max-w-md mx-auto">
+          <div className="grid grid-cols-1 gap-3">
+            <div className="text-left">
+              <label className="text-sm font-medium text-[#1A312C]/60">Image Title</label>
+              <input
+                type="text"
+                placeholder="Enter image title..."
+                value={uploadTitle}
+                onChange={(e) => setUploadTitle(e.target.value)}
+                className="input-modern mt-1"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+            <div className="text-left">
+              <label className="text-sm font-medium text-[#1A312C]/60">Description</label>
+              <input
+                type="text"
+                placeholder="Enter image description..."
+                value={uploadDescription}
+                onChange={(e) => setUploadDescription(e.target.value)}
+                className="input-modern mt-1"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-[#1A312C]/30 mt-2">
+            💡 Title & description help AI analyze image context
+          </p>
+        </div>
+
         {uploading && (
           <div className="mt-4">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-[#428475] border-t-transparent" />
@@ -154,12 +204,16 @@ const ImageUpload = ({ onUploadComplete }) => {
                   <div className="aspect-square rounded-lg overflow-hidden border border-[#428475]/10 bg-[#1A312C]/5">
                     <img
                       src={`http://localhost:8000/uploads/${img.filename}`}
-                      alt={img.filename}
+                      alt={img.title || img.filename}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23428475" stroke-width="1"%3E%3Crect x="3" y="3" width="18" height="18" rx="2"/%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"/%3E%3Cpath d="M21 15l-5-5L5 21"/%3E%3C/svg%3E';
                       }}
                     />
+                    {/* Show title on hover */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                      {img.title || img.filename}
+                    </div>
                   </div>
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <button
@@ -169,7 +223,7 @@ const ImageUpload = ({ onUploadComplete }) => {
                       <FontAwesomeIcon icon={faTrash} className="text-sm" />
                     </button>
                   </div>
-                  <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
+                  <div className="absolute top-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">
                     {img.mime_type?.split('/')[1]?.toUpperCase() || 'IMG'}
                   </div>
                 </motion.div>
