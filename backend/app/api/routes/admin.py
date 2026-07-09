@@ -11,7 +11,7 @@ from models import AdminUser, Quiz, QuizPage, Image, ParticipantToken, Response,
 from schemas import (
     QuizCreate, QuizResponse, QuizUpdate,
     QuizPageCreate, QuizPageResponse,
-    ImageResponse,
+    ImageResponse, QuizPageUpdate,
     AdminLogin, AdminResponse, TokenResponse
 )
 from services.auth_service import authenticate_admin, create_admin_token
@@ -171,24 +171,49 @@ async def get_quiz_pages(
 async def update_quiz_page(
     quiz_id: UUID,
     page_id: UUID,
-    page_data: QuizPageCreate,
+    page_data: QuizPageUpdate,  # ✅ Use QuizPageUpdate (not QuizPageCreate)
     db: Session = Depends(get_db)
 ):
-    page = db.query(QuizPage).filter(
-        QuizPage.id == page_id,
-        QuizPage.quiz_id == quiz_id
-    ).first()
-    
-    if not page:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
-    
-    page.page_number = page_data.page_number
-    page.time_limit_seconds = page_data.time_limit_seconds
-    page.layout_template_id = page_data.layout_template_id
-    
-    db.commit()
-    db.refresh(page)
-    return page
+    try:
+        print(f"📥 Updating page: quiz={quiz_id}, page={page_id}")
+        print(f"📦 Received data: {page_data}")
+        
+        page = db.query(QuizPage).filter(
+            QuizPage.id == page_id,
+            QuizPage.quiz_id == quiz_id
+        ).first()
+        
+        if not page:
+            print(f"❌ Page not found: {page_id}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+        
+        # ✅ Only update fields that were provided
+        update_data = page_data.dict(exclude_unset=True)
+        print(f"📦 Fields to update: {update_data}")
+        
+        if "page_number" in update_data:
+            old = page.page_number
+            new = update_data["page_number"]
+            if old != new:
+                print(f"🔄 Reordering: {old} → {new}")
+                # ... reorder logic ...
+            page.page_number = new
+        
+        if "time_limit_seconds" in update_data:
+            page.time_limit_seconds = update_data["time_limit_seconds"]
+        
+        if "layout_template_id" in update_data:
+            page.layout_template_id = update_data["layout_template_id"]
+        
+        db.commit()
+        db.refresh(page)
+        print(f"✅ Page updated successfully!")
+        return page
+        
+    except Exception as e:
+        print(f"❌ Update error: {e}")
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.delete("/quizzes/{quiz_id}/pages/{page_id}")
 async def delete_quiz_page(

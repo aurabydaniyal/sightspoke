@@ -2,6 +2,7 @@
 from .analyzer import AIAnalyzer
 from .groq_client import GroqClient
 from .chat_service import ChatService
+from .quiz_generator import QuizGenerator  # ✅ ADD THIS
 from .schemas import (
     AIAnalyzeRequest,
     AIChatRequest,
@@ -18,6 +19,7 @@ __all__ = [
     "AIAnalyzer",
     "GroqClient",
     "ChatService",
+    "QuizGenerator",  # ✅ ADD THIS
     "AIAnalyzeRequest",
     "AIChatRequest",
     "AIAdminQARequest",

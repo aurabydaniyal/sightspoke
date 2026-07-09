@@ -68,3 +68,16 @@ export const analyzeParticipantChat = async (quizId, participantTokenId) => {
   const response = await adminApi.post(`/ai/participant/analyze-chat?quiz_id=${quizId}&participant_token_id=${participantTokenId}`);
   return response.data;
 };
+
+// ============================================================
+// AI QUIZ GENERATOR
+// ============================================================
+
+export const generateQuizWithAI = async (topic, description, pageCount) => {
+  const response = await adminApi.post('/ai/generate-quiz', {
+    topic: topic,
+    description: description,
+    page_count: pageCount
+  });
+  return response.data;
+};

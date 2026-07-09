@@ -10,7 +10,6 @@ import { analyzeQuizResponses, getQuizAIInsights } from '../../api/aiApi';
 import SkeletonLoader, { LoadingMessage } from '../common/SkeletonLoader';
 import DotField from '../common/DotField';
 import { useAlert } from '../common/CustomAlert';
-import toast from 'react-hot-toast';
 
 const AIInsights = ({ quizId, quizTitle }) => {
   const { success, error, warning, info } = useAlert();
@@ -41,7 +40,6 @@ const AIInsights = ({ quizId, quizTitle }) => {
         }
         if (latest.content) {
           const mostSelected = latest.content.most_selected || null;
-          // ✅ FIX: Round avgLatency to 2 decimal places
           const avgLatency = latest.content.avg_latency;
           const formattedLatency = avgLatency !== undefined && avgLatency !== null && avgLatency !== '—' 
             ? parseFloat(avgLatency).toFixed(2) 
@@ -70,7 +68,6 @@ const AIInsights = ({ quizId, quizTitle }) => {
       if (result && result.analysis) {
         setAnalysis(result.analysis);
         const mostSelected = result.most_selected || null;
-        // ✅ FIX: Round avgLatency to 2 decimal places
         const avgLatency = result.avg_latency;
         const formattedLatency = avgLatency !== undefined && avgLatency !== null && avgLatency !== '—' 
           ? parseFloat(avgLatency).toFixed(2) 
@@ -131,6 +128,20 @@ Most Selected: ${stats.mostSelected?.title || stats.mostSelected?.filename || 'N
     success('Report downloaded!');
   };
 
+  // ✅ Helper: Get image source
+  const getImageSrc = (image) => {
+    if (!image) return '';
+    if (image.url && image.url.startsWith('http')) return image.url;
+    if (image.file_path && image.file_path.startsWith('http')) return image.file_path;
+    if (image.file_path && image.file_path.startsWith('/uploads/')) {
+      return `http://localhost:8000${image.file_path}`;
+    }
+    if (image.filename) {
+      return `http://localhost:8000/uploads/${image.filename}`;
+    }
+    return '';
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -164,7 +175,6 @@ Most Selected: ${stats.mostSelected?.title || stats.mostSelected?.filename || 'N
 
   return (
     <div className="relative min-h-[400px]">
-      {/* DotField Background */}
       <div className="absolute inset-0 rounded-xl overflow-hidden">
         <DotField
           dotRadius={1.5}
@@ -182,7 +192,6 @@ Most Selected: ${stats.mostSelected?.title || stats.mostSelected?.filename || 'N
         />
       </div>
 
-      {/* Content */}
       <div className="relative z-10 p-6 space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -206,17 +215,17 @@ Most Selected: ${stats.mostSelected?.title || stats.mostSelected?.filename || 'N
           </div>
         </div>
 
-        {/* ✅ Most Selected Image Card - FIXED with image display */}
-        {stats.mostSelected && stats.mostSelected.url && (
+        {/* ✅ Most Selected Image Card with IMAGE */}
+        {stats.mostSelected && (
           <div className="glass-card p-4">
             <h4 className="font-semibold text-[#1A312C] mb-3 flex items-center gap-2">
               <FontAwesomeIcon icon={faImage} className="text-[#89D7B7]" />
               Most Selected Image
             </h4>
             <div className="flex items-center gap-4">
-              <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[#428475]/10">
+              <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[#428475]/10 bg-[#1A312C]/5">
                 <img
-                  src={`http://localhost:8000${stats.mostSelected.url}`}
+                  src={getImageSrc(stats.mostSelected)}
                   alt={stats.mostSelected.title || 'Most selected image'}
                   className="w-full h-full object-cover"
                   onError={(e) => {

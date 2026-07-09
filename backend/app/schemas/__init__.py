@@ -1,9 +1,10 @@
 from .admin import AdminLogin, AdminResponse, TokenResponse
 from .quiz import (
     QuizBase, QuizCreate, QuizUpdate, QuizResponse,
-    QuizPageBase, QuizPageCreate, QuizPageResponse,
+    QuizPageBase, QuizPageCreate, QuizPageUpdate,  # ✅ ADD QuizPageUpdate
+    QuizPageResponse,
     LayoutTemplateBase, LayoutTemplateResponse,
-    ImageBase, ImageResponse, PageImageSummary  # ✅ ADD PageImageSummary
+    ImageBase, ImageResponse
 )
 from .response import ResponseBase, ResponseCreate, ResponseResponse
 
@@ -17,12 +18,12 @@ __all__ = [
     "QuizResponse",
     "QuizPageBase",
     "QuizPageCreate",
+    "QuizPageUpdate",  # ✅ ADD THIS
     "QuizPageResponse",
     "LayoutTemplateBase",
     "LayoutTemplateResponse",
     "ImageBase",
     "ImageResponse",
-    "PageImageSummary",  # ✅ ADD THIS
     "ResponseBase",
     "ResponseCreate",
     "ResponseResponse"

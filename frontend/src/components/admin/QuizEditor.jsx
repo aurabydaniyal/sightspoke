@@ -26,18 +26,27 @@ const QuizEditor = () => {
   const [newQuizData, setNewQuizData] = useState({
     title: '',
     description: '',
-    is_published: false
+    is_published: false,
+    ai_overview: ''
   });
 
+  const getImageSrc = (image) => {
+    if (!image) return '';
+    if (image.url && image.url.startsWith('http')) return image.url;
+    if (image.file_path && image.file_path.startsWith('http')) return image.file_path;
+    if (image.file_path && image.file_path.startsWith('/uploads/')) {
+      return `http://localhost:8000${image.file_path}`;
+    }
+    return `http://localhost:8000/uploads/${image.filename || ''}`;
+  };
+
   useEffect(() => {
-    console.log('📌 Quiz ID from URL:', id);
     if (id && id !== 'create' && id !== 'undefined') {
       loadQuiz();
     } else {
       setIsNewQuiz(true);
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadQuiz = async () => {
@@ -113,50 +122,65 @@ const QuizEditor = () => {
     }
   };
 
-  // ✅ FIXED: updatePage with proper NaN handling
+  // ✅ FIXED: Only sends the field that changed
   const updatePage = async (pageId, data) => {
     try {
-      // ✅ Handle empty values properly - prevent NaN
-      const pageNumber = data.page_number !== undefined && data.page_number !== '' 
-        ? parseInt(data.page_number, 10) 
-        : 1;
-        
-      const timeLimit = data.time_limit_seconds !== undefined && data.time_limit_seconds !== '' 
-        ? parseInt(data.time_limit_seconds, 10) 
-        : 10;
-        
-      const layoutId = data.layout_template_id !== undefined && data.layout_template_id !== '' 
-        ? parseInt(data.layout_template_id, 10) 
-        : null;
+      const payload = {};
       
-      // ✅ Validate numbers
-      if (isNaN(pageNumber) || pageNumber < 1) {
-        warning('Page number must be at least 1');
-        return;
-      }
-      if (isNaN(timeLimit) || timeLimit < 3 || timeLimit > 60) {
-        warning('Time limit must be between 3 and 60 seconds');
-        return;
+      // ✅ Only add page_number if it exists and is valid
+      if (data.page_number !== undefined && data.page_number !== '' && data.page_number !== null) {
+        const pageNumber = parseInt(data.page_number, 10);
+        if (isNaN(pageNumber) || pageNumber < 1) {
+          warning('Page number must be at least 1');
+          return;
+        }
+        payload.page_number = pageNumber;
       }
       
-      const payload = {
-        page_number: pageNumber,
-        time_limit_seconds: timeLimit,
-        layout_template_id: layoutId
-      };
+      // ✅ Only add time_limit_seconds if it exists and is valid
+      if (data.time_limit_seconds !== undefined && data.time_limit_seconds !== '' && data.time_limit_seconds !== null) {
+        const timeLimit = parseInt(data.time_limit_seconds, 10);
+        if (isNaN(timeLimit) || timeLimit < 3 || timeLimit > 60) {
+          warning('Time limit must be between 3 and 60 seconds');
+          return;
+        }
+        payload.time_limit_seconds = timeLimit;
+      }
       
-      console.log('📤 Updating page with payload:', payload);
+      // ✅ Only add layout_template_id if it exists and is valid
+      if (data.layout_template_id !== undefined && data.layout_template_id !== '' && data.layout_template_id !== null) {
+        const layoutId = parseInt(data.layout_template_id, 10);
+        if (isNaN(layoutId) || layoutId < 1 || layoutId > 4) {
+          warning('Invalid layout selected');
+          return;
+        }
+        payload.layout_template_id = layoutId;
+      }
       
-      const response = await adminApi.put(`/quizzes/${id}/pages/${pageId}`, payload);
-      console.log('✅ Update response:', response.data);
+      // ✅ If nothing to update, show message
+      if (Object.keys(payload).length === 0) {
+        warning('No changes to update');
+        return;
+      }
       
-      const updated = pages.map(p => p.id === pageId ? { ...p, ...data } : p);
-      setPages(updated);
+      console.log('📤 Sending payload:', payload);
+      
+      await adminApi.put(`/quizzes/${id}/pages/${pageId}`, payload);
+      
+      // ✅ Refresh pages to get updated data
+      const pagesRes = await adminApi.get(`/quizzes/${id}/pages`);
+      setPages(pagesRes.data);
       success('Page updated!');
     } catch (err) {
       console.error('❌ Update error:', err);
-      const errorMsg = err.response?.data?.detail || err.message || 'Failed to update page';
-      error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+      console.error('❌ Response data:', err.response?.data);
+      
+      // ✅ Show the actual error message from backend
+      const errorMsg = err.response?.data?.detail?.[0]?.msg || 
+                       err.response?.data?.detail || 
+                       err.message || 
+                       'Failed to update page';
+      error(typeof errorMsg === 'string' ? errorMsg : 'Failed to update page');
     }
   };
 
@@ -218,10 +242,31 @@ const QuizEditor = () => {
             <textarea
               placeholder="Enter quiz description..."
               value={newQuizData.description}
-              onChange={(e) => setNewQuizData({ ...newQuizData, description: e.target.value })}
+              onChange={(e) => {
+                setNewQuizData({ 
+                  ...newQuizData, 
+                  description: e.target.value,
+                  ai_overview: e.target.value
+                });
+              }}
               className="input-modern resize-none"
               rows="4"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[#1A312C]/60 mb-1">
+              🤖 AI Overview (for participant chatbot)
+            </label>
+            <textarea
+              placeholder="Describe the quiz topic for AI to stay focused..."
+              value={newQuizData.ai_overview}
+              onChange={(e) => setNewQuizData({ ...newQuizData, ai_overview: e.target.value })}
+              className="input-modern resize-none"
+              rows="2"
+            />
+            <p className="text-xs text-[#1A312C]/30 mt-1">
+              This helps the AI chatbot stay on topic during participant conversations.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -266,7 +311,6 @@ const QuizEditor = () => {
         </button>
       </div>
 
-      {/* Page List with Image Count */}
       <div className="flex flex-wrap gap-2 pb-4">
         {pages.map((page, index) => {
           const imageCount = page.page_images?.length || 0;
@@ -290,7 +334,6 @@ const QuizEditor = () => {
         {pages.length === 0 && <p className="text-[#1A312C]/40 py-2">No pages yet. Click "Add Page"</p>}
       </div>
 
-      {/* Page Editor */}
       {currentPage && (
         <motion.div
           key={currentPage.id}
@@ -321,8 +364,11 @@ const QuizEditor = () => {
                 min="1"
               />
             </div>
+            
             <div>
-              <label className="text-sm font-medium text-[#1A312C]/60"><FontAwesomeIcon icon={faClock} className="mr-1" /> Time Limit (seconds)</label>
+              <label className="text-sm font-medium text-[#1A312C]/60">
+                <FontAwesomeIcon icon={faClock} className="mr-1" /> Time Limit (seconds)
+              </label>
               <input
                 type="number"
                 value={currentPage.time_limit_seconds}
@@ -332,8 +378,11 @@ const QuizEditor = () => {
                 max="60"
               />
             </div>
+            
             <div>
-              <label className="text-sm font-medium text-[#1A312C]/60"><FontAwesomeIcon icon={faTable} className="mr-1" /> Layout</label>
+              <label className="text-sm font-medium text-[#1A312C]/60">
+                <FontAwesomeIcon icon={faTable} className="mr-1" /> Layout
+              </label>
               <select
                 value={currentPage.layout_template_id || 1}
                 onChange={(e) => updatePage(currentPage.id, { layout_template_id: e.target.value })}
@@ -346,7 +395,6 @@ const QuizEditor = () => {
             </div>
           </div>
 
-          {/* Images on this page */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-[#1A312C]"><FontAwesomeIcon icon={faImage} className="mr-2" /> Images on this page</h3>
@@ -355,27 +403,31 @@ const QuizEditor = () => {
               </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {currentPage.page_images?.map((pi) => (
-                <div key={pi.id} className="relative group">
-                  <img
-                    src={`http://localhost:8000/uploads/${pi.image?.filename}`}
-                    alt="page"
-                    className="w-full h-24 object-cover rounded-lg border border-[#428475]/10"
-                    onError={(e) => {
-                      e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23428475" stroke-width="1"%3E%3Crect x="3" y="3" width="18" height="18" rx="2"/%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"/%3E%3Cpath d="M21 15l-5-5L5 21"/%3E%3C/svg%3E';
-                    }}
-                  />
-                  <button
-                    onClick={() => removeImageFromPage(currentPage.id, pi.image_id)}
-                    className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                  >
-                    <FontAwesomeIcon icon={faTrash} className="text-xs" />
-                  </button>
-                  <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1.5 py-0.5 rounded">
-                    #{pi.position_index !== null ? pi.position_index + 1 : '?'}
+              {currentPage.page_images?.map((pi) => {
+                const img = pi.image;
+                const imgSrc = getImageSrc(img);
+                return (
+                  <div key={pi.id} className="relative group">
+                    <img
+                      src={imgSrc}
+                      alt={img?.title || 'page image'}
+                      className="w-full h-24 object-cover rounded-lg border border-[#428475]/10"
+                      onError={(e) => {
+                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23428475" stroke-width="1"%3E%3Crect x="3" y="3" width="18" height="18" rx="2"/%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"/%3E%3Cpath d="M21 15l-5-5L5 21"/%3E%3C/svg%3E';
+                      }}
+                    />
+                    <button
+                      onClick={() => removeImageFromPage(currentPage.id, pi.image_id)}
+                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    >
+                      <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                    </button>
+                    <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1.5 py-0.5 rounded">
+                      {img?.title ? img.title.substring(0, 15) : '#' + (pi.position_index !== null ? pi.position_index + 1 : '?')}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="mt-4">
               <select
@@ -391,7 +443,9 @@ const QuizEditor = () => {
                 {allImages
                   .filter(img => !currentPage.page_images?.some(pi => pi.image_id === img.id))
                   .map(img => (
-                    <option key={img.id} value={img.id}>{img.filename}</option>
+                    <option key={img.id} value={img.id}>
+                      {img.title || img.filename}
+                    </option>
                   ))
                 }
               </select>

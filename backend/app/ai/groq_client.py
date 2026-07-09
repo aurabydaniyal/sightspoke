@@ -167,21 +167,37 @@ class GroqClient:
     async def analyze_responses(
         self,
         responses: List[Dict[str, Any]],
-        quiz_info: Dict[str, Any]
+        quiz_info: Dict[str, Any],
+        chat_history: List[Dict[str, Any]] = []  # ✅ ADD THIS PARAMETER
     ) -> str:
         """Analyze participant responses and generate insights"""
         
-        # ✅ Build response summary with image TITLES instead of UUIDs
+        # ✅ Include chat history in the prompt
+        chat_summary = ""
+        if chat_history:
+            # Summarize chat messages
+            participant_messages = [c for c in chat_history if c.get("sender") == "participant"]
+            ai_messages = [c for c in chat_history if c.get("sender") == "ai"]
+            
+            chat_summary = f"""
+            Chat History:
+            - Total Messages: {len(chat_history)}
+            - Participant Messages: {len(participant_messages)}
+            - AI Responses: {len(ai_messages)}
+            
+            Sample Messages:
+            {json.dumps(chat_history[:20], indent=2)}
+            """
+        
         formatted_responses = []
         for r in responses:
-            # Get image title if available
             image_title = r.get("selected_image_title", "Unknown Image")
             image_desc = r.get("selected_image_description", "")
             
             formatted_responses.append({
                 "page": r.get("page_number", "Unknown"),
-                "selected_image": image_title,  # ✅ Use title!
-              "image_description": image_desc[:100] if image_desc else "",  # ✅ Include description
+                "selected_image": image_title,
+                "image_description": image_desc[:100] if image_desc else "",
                 "decision_time_ms": r.get("latency_ms", 0),
                 "timed_out": r.get("timeout_flag", False),
                 "time_limit": r.get("time_limit_seconds", 0)
@@ -191,7 +207,10 @@ class GroqClient:
             "total_responses": len(responses),
             "quiz_title": quiz_info.get("title", "Unknown"),
             "quiz_description": quiz_info.get("description", ""),
-            "responses": formatted_responses
+            "responses": formatted_responses,
+            "chat_history": chat_summary,  # ✅ ADD CHAT SUMMARY
+            "total_chat_messages": quiz_info.get("total_chat_messages", 0),
+            "chat_participants": quiz_info.get("chat_participants", 0)
         }
         
         system_prompt = """You are SightSpoke AI, an expert in behavioral analysis and visual preference testing.
@@ -203,6 +222,8 @@ class GroqClient:
         2. For example, say "Mountain Landscape" instead of "/uploads/image123.jpg"
         3. If an image has a description, use it to provide context
         4. Be specific about which images were most selected
+        5. If chat history is provided, include insights about what participants asked most
+        6. If no chat history is available, mention that chat history was not available
         """
         
         user_prompt = f"""
@@ -210,14 +231,15 @@ class GroqClient:
         I collected {len(responses)} responses from participants.
         
         Response Data:
-        {json.dumps(response_summary, indent=2)[:8000]}
+        {json.dumps(response_summary, indent=2)[:10000]}
         
         Please provide:
         1. Key patterns in selections (use image TITLES)
         2. Insights about decision-making behavior
         3. Recommendations for the admin
-        4. What participants asked about most (if chat history available)
+        4. What participants asked about most (use the chat history provided above)
         
+        If no chat history is available, clearly state: "Chat history not available for this analysis."
         Be specific about which images were most selected using their titles.
         """
         

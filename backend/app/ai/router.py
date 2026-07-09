@@ -4,12 +4,13 @@ from uuid import UUID
 from typing import List
 
 from database import get_db
-from models import Quiz, ParticipantToken
+from models import Quiz, ParticipantToken, AdminUser
 from .schemas import (
     AIAnalyzeRequest, AIChatRequest, AIAdminQARequest,
     AIGenerateFAQsRequest
 )
 from .analyzer import AIAnalyzer
+from .quiz_generator import QuizGenerator
 
 router = APIRouter(tags=["AI"])
 
@@ -199,4 +200,40 @@ async def generate_combined_chat_summary(
         return result
     except Exception as e:
         print(f"❌ Combined chat summary error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/generate-quiz")
+async def generate_quiz(
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """Generate a complete quiz using AI + Pexels"""
+    
+    # Get admin user
+    admin = db.query(AdminUser).filter(AdminUser.is_active == True).first()
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found")
+    
+    topic = request.get("topic")
+    description = request.get("description", "")
+    page_count = request.get("page_count", 3)
+    
+    if not topic:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Topic is required")
+    
+    if page_count < 3 or page_count > 6:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page count must be between 3 and 6")
+    
+    generator = QuizGenerator()
+    try:
+        result = await generator.generate_quiz(
+            admin_id=admin.id,
+            topic=topic,
+            description=description,
+            page_count=page_count,
+            db=db
+        )
+        return result
+    except Exception as e:
+        print(f"❌ Quiz generation error: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

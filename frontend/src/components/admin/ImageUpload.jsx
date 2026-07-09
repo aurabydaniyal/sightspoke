@@ -202,14 +202,16 @@ const ImageUpload = ({ onUploadComplete }) => {
                   className="relative group"
                 >
                   <div className="aspect-square rounded-lg overflow-hidden border border-[#428475]/10 bg-[#1A312C]/5">
-                    <img
-                      src={`http://localhost:8000/uploads/${img.filename}`}
-                      alt={img.title || img.filename}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23428475" stroke-width="1"%3E%3Crect x="3" y="3" width="18" height="18" rx="2"/%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"/%3E%3Cpath d="M21 15l-5-5L5 21"/%3E%3C/svg%3E';
-                      }}
-                    />
+                      <img
+                        src={img.file_path && img.file_path.startsWith('http') 
+                          ? img.file_path 
+                          : `http://localhost:8000/uploads/${img.filename}`}
+                        alt={img.title || img.filename}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="%23428475" stroke-width="1"%3E%3Crect x="3" y="3" width="18" height="18" rx="2"/%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"/%3E%3Cpath d="M21 15l-5-5L5 21"/%3E%3C/svg%3E';
+                        }}
+                      />
                     {/* Show title on hover */}
                     <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">
                       {img.title || img.filename}

@@ -4,16 +4,18 @@ import { motion } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faPlus, faEdit, faTrash, faLink, faDownload,
-  faClock, faUsers, faInfoCircle
+  faClock, faUsers, faInfoCircle, faWandMagicSparkles
 } from '@fortawesome/free-solid-svg-icons';
 import { adminApi } from '../../api/axiosConfig';
 import { useAlert } from '../common/CustomAlert';
+import GenerateQuizModal from './GenerateQuizModal'; // ✅ NEW
 
 const QuizList = () => {
   const { success, error, warning, confirm } = useAlert();
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false); // ✅ NEW
   const navigate = useNavigate();
 
   const [newQuiz, setNewQuiz] = useState({
@@ -34,7 +36,6 @@ const QuizList = () => {
       setQuizzes(response.data);
     } catch (err) {
       console.error('❌ Load quizzes error:', err);
-      // ✅ Ensure error message is a string
       const errorMsg = typeof err === 'string' ? err : err?.message || 'Failed to load quizzes';
       error(errorMsg);
     } finally {
@@ -57,7 +58,6 @@ const QuizList = () => {
       navigate(`/admin/quizzes/${response.data.id}/edit`);
     } catch (err) {
       console.error('❌ Create quiz error:', err);
-      // ✅ Ensure error message is a string
       const errorMsg = typeof err === 'string' ? err : err?.response?.data?.detail || err?.message || 'Failed to create quiz';
       error(errorMsg);
     }
@@ -87,6 +87,14 @@ const QuizList = () => {
       : <span className="px-2 py-1 rounded-full text-xs font-medium bg-[#1A312C]/10 text-[#1A312C]/60">Draft</span>;
   };
 
+  // ✅ Handle quiz generation success
+  const handleQuizGenerated = (newQuiz) => {
+    success('Quiz generated successfully! 🎉');
+    setShowGenerateModal(false);
+    loadQuizzes();
+    navigate(`/admin/quizzes/${newQuiz.quiz_id}/edit`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -105,12 +113,22 @@ const QuizList = () => {
             {quizzes.length} {quizzes.length === 1 ? 'quiz' : 'quizzes'} total
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="btn-neon"
-        >
-          <FontAwesomeIcon icon={faPlus} /> New Quiz
-        </button>
+        <div className="flex gap-3">
+          {/* ✅ Generate Quiz Button */}
+          <button
+            onClick={() => setShowGenerateModal(true)}
+            className="btn-glass !px-4 !py-2.5 text-[#428475] border-[#428475]/30 hover:bg-[#428475]/10"
+          >
+            <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2" />
+            Generate
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="btn-neon"
+          >
+            <FontAwesomeIcon icon={faPlus} /> New Quiz
+          </button>
+        </div>
       </div>
 
       {/* Quiz Grid */}
@@ -119,12 +137,21 @@ const QuizList = () => {
           <div className="text-6xl mb-4">📝</div>
           <h3 className="text-xl font-semibold text-[#1A312C] mb-2">No Quizzes Yet</h3>
           <p className="text-[#1A312C]/50 mb-4">Create your first quiz to get started</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-neon"
-          >
-            <FontAwesomeIcon icon={faPlus} /> Create Quiz
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn-neon"
+            >
+              <FontAwesomeIcon icon={faPlus} /> Create Quiz
+            </button>
+            <button
+              onClick={() => setShowGenerateModal(true)}
+              className="btn-glass"
+            >
+              <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2" />
+              Generate with AI
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -278,6 +305,13 @@ const QuizList = () => {
           </motion.div>
         </div>
       )}
+
+      {/* ✅ Generate Quiz Modal */}
+      <GenerateQuizModal
+        isOpen={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        onSuccess={handleQuizGenerated}
+      />
     </div>
   );
 };

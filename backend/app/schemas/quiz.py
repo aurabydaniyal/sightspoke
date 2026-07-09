@@ -62,12 +62,19 @@ class PageImageSummary(BaseModel):
 # ============================================================
 
 class QuizPageBase(BaseModel):
-    page_number: int
-    time_limit_seconds: int = 10
-    layout_template_id: Optional[int]
+    page_number: Optional[int] = None  # ✅ Make it Optional
+    time_limit_seconds: Optional[int] = 10  # ✅ Make it Optional
+    layout_template_id: Optional[int] = None
 
 class QuizPageCreate(QuizPageBase):
-    pass
+    page_number: int  # ✅ Required for CREATE (new page)
+    time_limit_seconds: int = 10
+    layout_template_id: Optional[int] = None
+
+class QuizPageUpdate(QuizPageBase):  # ✅ NEW: For UPDATE operations
+    page_number: Optional[int] = None
+    time_limit_seconds: Optional[int] = None
+    layout_template_id: Optional[int] = None
 
 class QuizPageResponse(QuizPageBase):
     id: UUID

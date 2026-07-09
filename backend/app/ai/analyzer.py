@@ -44,11 +44,22 @@ class AIAnalyzer:
         for r in responses:
             img = image_map.get(str(r.selected_image_id)) if r.selected_image_id else None
             
+            # ✅ Get image URL for display
+            img_url = ""
+            if img:
+                if img.file_path and img.file_path.startswith('http'):
+                    img_url = img.file_path
+                elif img.file_path and img.file_path.startswith('/uploads/'):
+                    img_url = img.file_path
+                else:
+                    img_url = f"/uploads/{img.filename}" if img.filename else ""
+            
             response_data.append({
                 "page_number": r.page.page_number if r.page else None,
                 "selected_image_id": str(r.selected_image_id) if r.selected_image_id else None,
                 "selected_image_title": img.title if img else "Unknown Image",
                 "selected_image_description": img.description if img else "",
+                "selected_image_url": img_url,  # ✅ ADD URL for display
                 "selected_position_index": r.selected_position_index,
                 "latency_ms": r.latency_ms,
                 "timeout_flag": r.timeout_flag,
@@ -76,7 +87,6 @@ class AIAnalyzer:
         # ✅ Calculate most selected image with full metadata
         most_selected = None
         if response_data:
-            # Count selections by image title
             selected_titles = [r.get("selected_image_title") for r in response_data if r.get("selected_image_title")]
             if selected_titles:
                 most_common = Counter(selected_titles).most_common(1)[0]
@@ -87,8 +97,8 @@ class AIAnalyzer:
                             "title": most_common[0],
                             "count": most_common[1],
                             "percentage": round((most_common[1] / len(response_data) * 100), 1),
-                            "url": r.get("selected_image_url", ""),  # ✅ ADD URL
-                            "description": r.get("selected_image_description", ""),  # ✅ ADD DESCRIPTION
+                            "url": r.get("selected_image_url", ""),  # ✅ URL for display
+                            "description": r.get("selected_image_description", ""),
                             "selection_count": most_common[1]
                         }
                         break
@@ -96,7 +106,12 @@ class AIAnalyzer:
                 if most_selected and not most_selected.get("url"):
                     for img_id, img in image_map.items():
                         if img.title == most_selected["title"]:
-                            most_selected["url"] = f"/uploads/{img.filename}"
+                            if img.file_path and img.file_path.startswith('http'):
+                                most_selected["url"] = img.file_path
+                            elif img.file_path and img.file_path.startswith('/uploads/'):
+                                most_selected["url"] = img.file_path
+                            else:
+                                most_selected["url"] = f"/uploads/{img.filename}" if img.filename else ""
                             most_selected["description"] = img.description or ""
                             break
         
@@ -207,10 +222,21 @@ class AIAnalyzer:
         response_data = []
         for r in responses[:50]:
             img = db.query(Image).filter(Image.id == r.selected_image_id).first() if r.selected_image_id else None
+            # ✅ Get image URL
+            img_url = ""
+            if img:
+                if img.file_path and img.file_path.startswith('http'):
+                    img_url = img.file_path
+                elif img.file_path and img.file_path.startswith('/uploads/'):
+                    img_url = img.file_path
+                else:
+                    img_url = f"/uploads/{img.filename}" if img.filename else ""
+            
             response_data.append({
                 "page_number": r.page.page_number if r.page else None,
                 "selected_image_title": img.title if img else "Unknown Image",
                 "selected_image_description": img.description if img else "",
+                "selected_image_url": img_url,  # ✅ ADD URL
                 "selected_position_index": r.selected_position_index,
                 "latency_ms": r.latency_ms,
                 "timeout_flag": r.timeout_flag
@@ -293,9 +319,21 @@ class AIAnalyzer:
         response_data = []
         for r in responses:
             img = db.query(Image).filter(Image.id == r.selected_image_id).first() if r.selected_image_id else None
+            # ✅ Get image URL
+            img_url = ""
+            if img:
+                if img.file_path and img.file_path.startswith('http'):
+                    img_url = img.file_path
+                elif img.file_path and img.file_path.startswith('/uploads/'):
+                    img_url = img.file_path
+                else:
+                    img_url = f"/uploads/{img.filename}" if img.filename else ""
+            
             response_data.append({
                 "page_number": r.page.page_number if r.page else None,
                 "selected_image_title": img.title if img else "Unknown",
+                "selected_image_description": img.description if img else "",
+                "selected_image_url": img_url,  # ✅ ADD URL
                 "selected_position_index": r.selected_position_index,
                 "latency_ms": r.latency_ms,
                 "timeout_flag": r.timeout_flag
@@ -390,7 +428,7 @@ class AIAnalyzer:
         Total Participants: {len(participant_ids)}
         
         Chat Messages:
-        {json.dumps(chat_data[:100], indent=2)}  # Limit to 100 messages for efficiency
+        {json.dumps(chat_data[:100], indent=2)}
         
         Please provide a COMBINED SUMMARY that covers:
         1. Most common questions asked by participants
