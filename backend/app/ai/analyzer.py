@@ -13,7 +13,7 @@ class AIAnalyzer:
     """Core AI analysis logic"""
     
     def __init__(self):
-        self.groq = GroqClient()  # ✅ Fixed: was self.grok before
+        self.groq = GroqClient()
     
     async def analyze_quiz_responses(
         self,
@@ -35,7 +35,7 @@ class AIAnalyzer:
         if not responses:
             return {"error": "No responses found for analysis"}
         
-        # Get all images with their titles
+        # Get all images with their titles and descriptions
         image_ids = [r.selected_image_id for r in responses if r.selected_image_id]
         images = db.query(Image).filter(Image.id.in_(image_ids)).all() if image_ids else []
         image_map = {str(img.id): img for img in images}
@@ -71,20 +71,40 @@ class AIAnalyzer:
             "ai_overview": quiz.ai_overview or ""
         }
         
-        # ✅ FIX: Use self.groq (not self.grok)
         response = await self.groq.analyze_responses(response_data, quiz_info)
         
-        # Calculate most selected image
+        # ✅ Calculate most selected image with full metadata
         most_selected = None
         if response_data:
+            # Count selections by image title
             selected_titles = [r.get("selected_image_title") for r in response_data if r.get("selected_image_title")]
             if selected_titles:
                 most_common = Counter(selected_titles).most_common(1)[0]
-                most_selected = {
-                    "title": most_common[0],
-                    "count": most_common[1],
-                    "percentage": round((most_common[1] / len(response_data) * 100), 1)
-                }
+                # Find the image with this title to get URL and description
+                for r in response_data:
+                    if r.get("selected_image_title") == most_common[0]:
+                        most_selected = {
+                            "title": most_common[0],
+                            "count": most_common[1],
+                            "percentage": round((most_common[1] / len(response_data) * 100), 1),
+                            "url": r.get("selected_image_url", ""),  # ✅ ADD URL
+                            "description": r.get("selected_image_description", ""),  # ✅ ADD DESCRIPTION
+                            "selection_count": most_common[1]
+                        }
+                        break
+                # If no URL found, try to get from image_map
+                if most_selected and not most_selected.get("url"):
+                    for img_id, img in image_map.items():
+                        if img.title == most_selected["title"]:
+                            most_selected["url"] = f"/uploads/{img.filename}"
+                            most_selected["description"] = img.description or ""
+                            break
+        
+        # ✅ Calculate avg latency with 2 decimal places
+        avg_latency = 0
+        if responses:
+            total_latency = sum(r.latency_ms for r in responses if r.latency_ms)
+            avg_latency = round((total_latency / len(responses) / 1000), 2) if responses else 0
         
         insight = AIInsight(
             quiz_id=quiz_id,
@@ -95,7 +115,7 @@ class AIAnalyzer:
                 "total_responses": len(responses),
                 "chat_history": chat_history if participant_token_id else [],
                 "most_selected": most_selected,
-                "avg_latency": sum(r.latency_ms for r in responses if r.latency_ms) / len(responses) / 1000 if responses else 0
+                "avg_latency": avg_latency
             }
         )
         db.add(insight)
@@ -108,7 +128,7 @@ class AIAnalyzer:
             "total_responses": len(responses),
             "chat_history": chat_history if participant_token_id else [],
             "most_selected": most_selected,
-            "avg_latency": sum(r.latency_ms for r in responses if r.latency_ms) / len(responses) / 1000 if responses else 0
+            "avg_latency": avg_latency
         }
     
     async def generate_participant_chat_response(
@@ -138,7 +158,6 @@ class AIAnalyzer:
             "ai_overview": quiz.ai_overview or ""
         }
         
-        # ✅ FIX: Use self.groq
         response = await self.groq.generate_chat_response(
             message=message,
             quiz_info=quiz_info,
@@ -185,7 +204,6 @@ class AIAnalyzer:
             ParticipantChatLog.quiz_id == quiz_id
         ).order_by(ParticipantChatLog.created_at).all()
         
-        # ✅ Get image titles for each response
         response_data = []
         for r in responses[:50]:
             img = db.query(Image).filter(Image.id == r.selected_image_id).first() if r.selected_image_id else None
@@ -211,7 +229,7 @@ class AIAnalyzer:
         answer = await self.groq.generate_admin_qa(
             question=question,
             quiz_info=quiz_info,
-            responses=response_data  # ✅ Now contains image titles
+            responses=response_data
         )
         
         return answer
@@ -238,7 +256,6 @@ class AIAnalyzer:
         }
         
         try:
-            # ✅ FIX: Use self.groq
             faqs = await self.groq.generate_faqs(quiz_info)
             return faqs
         except Exception as e:
@@ -275,8 +292,10 @@ class AIAnalyzer:
         
         response_data = []
         for r in responses:
+            img = db.query(Image).filter(Image.id == r.selected_image_id).first() if r.selected_image_id else None
             response_data.append({
                 "page_number": r.page.page_number if r.page else None,
+                "selected_image_title": img.title if img else "Unknown",
                 "selected_position_index": r.selected_position_index,
                 "latency_ms": r.latency_ms,
                 "timeout_flag": r.timeout_flag
@@ -306,7 +325,6 @@ class AIAnalyzer:
             {"role": "user", "content": prompt}
         ]
         
-        # ✅ FIX: Use self.groq
         analysis = await self.groq.chat_completion(messages)
         
         insight = AIInsight(
@@ -328,4 +346,76 @@ class AIAnalyzer:
             "analysis": analysis,
             "chat_count": len(chats),
             "response_count": len(responses)
+        }
+    
+    # ✅ NEW METHOD: Combined chat summary for all participants
+    async def generate_combined_chat_summary(
+        self,
+        quiz_id: UUID,
+        db: Session
+    ) -> Dict[str, Any]:
+        """Generate a combined summary of all participant chats for a quiz"""
+        
+        # Get all chat logs for this quiz
+        chats = db.query(ParticipantChatLog).filter(
+            ParticipantChatLog.quiz_id == quiz_id
+        ).order_by(ParticipantChatLog.created_at).all()
+        
+        if not chats:
+            return {
+                "summary": "No chat activity found for this quiz.",
+                "total_messages": 0,
+                "participants": 0
+            }
+        
+        # Get unique participants
+        participant_ids = set()
+        chat_data = []
+        for c in chats:
+            participant_ids.add(str(c.participant_token_id))
+            chat_data.append({
+                "sender": c.sender,
+                "message": c.message,
+                "created_at": c.created_at.isoformat() if c.created_at else None
+            })
+        
+        # Get quiz info
+        quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+        
+        # Prepare prompt for combined analysis
+        prompt = f"""
+        Analyze ALL chat conversations from participants who took the quiz "{quiz.title if quiz else 'Unknown'}".
+        
+        Total Messages: {len(chats)}
+        Total Participants: {len(participant_ids)}
+        
+        Chat Messages:
+        {json.dumps(chat_data[:100], indent=2)}  # Limit to 100 messages for efficiency
+        
+        Please provide a COMBINED SUMMARY that covers:
+        1. Most common questions asked by participants
+        2. Key themes or topics discussed
+        3. Overall sentiment across all participants
+        4. Any concerns, confusion, or feedback mentioned
+        5. Recommendations for the admin
+        
+        Format as a professional report.
+        """
+        
+        system_prompt = """You are SightSpoke AI, an expert in analyzing participant feedback and questions.
+        Provide a comprehensive, combined summary of all participant conversations.
+        Focus on common themes, frequently asked questions, and overall sentiment.
+        """
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        
+        summary = await self.groq.chat_completion(messages, temperature=0.7, max_tokens=2000)
+        
+        return {
+            "summary": summary,
+            "total_messages": len(chats),
+            "participants": len(participant_ids)
         }

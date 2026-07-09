@@ -15,6 +15,7 @@ import QuizEditor from './components/admin/QuizEditor';
 import ImageUpload from './components/admin/ImageUpload';
 import TokenGenerator from './components/admin/TokenGenerator';
 import ResponseExporter from './components/admin/ResponseExporter';
+import Settings from './components/admin/Settings';
 import QuizInsights from './components/admin/QuizInsights';
 import QuizDetails from './components/admin/QuizDetails';
 import AIInsightsPage from './pages/AIInsightsPage';
@@ -156,10 +157,7 @@ function App() {
                       
                       <Route path="settings" element={
                         <div className="p-8 text-center text-[#1A312C]/60">
-                          <div className="glass-card p-12">
-                            <h2 className="text-2xl font-bold text-[#1A312C] mb-2">Settings</h2>
-                            <p>Coming soon...</p>
-                          </div>
+                          <Settings />
                         </div>
                       } />
                       

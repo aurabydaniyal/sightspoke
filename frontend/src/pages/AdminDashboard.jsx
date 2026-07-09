@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faFileAlt, faUsers, faChartBar, faClock, faPlus,
-  faChevronLeft, faChevronRight
+  faChevronLeft, faChevronRight, faHome, faImage, 
+  faLink, faDownload, faBrain, faGear
 } from '@fortawesome/free-solid-svg-icons';
 import { useNavigate } from 'react-router-dom';
 import { adminApi } from '../api/axiosConfig';
@@ -46,16 +47,24 @@ const AdminDashboard = () => {
   const [chartData, setChartData] = useState(null);
   const [pieData, setPieData] = useState(null);
   
-  // ✅ For auto-slide cards
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const slideIntervalRef = useRef(null);
+  const marqueeRef = useRef(null);
+
+  // Quick Actions Buttons
+  const quickActions = [
+    { label: 'Dashboard', icon: faHome, path: '/admin/dashboard', color: '#428475' },
+    { label: 'Quizzes', icon: faFileAlt, path: '/admin/quizzes', color: '#89D7B7' },
+    { label: 'Images', icon: faImage, path: '/admin/images', color: '#1A312C' },
+    { label: 'Tokens', icon: faLink, path: '/admin/tokens', color: '#428475' },
+    { label: 'AI Insights', icon: faBrain, path: '/admin/ai', color: '#89D7B7' },
+  ];
 
   useEffect(() => {
     loadDashboardData();
   }, []);
 
-  // ✅ Auto-slide effect
   useEffect(() => {
     if (isAutoPlaying && stats.totalQuizzes > 0) {
       slideIntervalRef.current = setInterval(() => {
@@ -68,6 +77,52 @@ const AdminDashboard = () => {
       }
     };
   }, [isAutoPlaying, stats.totalQuizzes]);
+
+  // ✅ Marquee Animation - Smooth Loop (FIXED)
+  useEffect(() => {
+    const marquee = marqueeRef.current;
+    if (!marquee) return;
+    
+    // Get all buttons
+    const items = marquee.querySelectorAll('button');
+    if (items.length === 0) return;
+    
+    // Calculate width of one set of items (first 5 buttons)
+    let totalWidth = 0;
+    for (let i = 0; i < quickActions.length && i < items.length; i++) {
+      totalWidth += items[i].offsetWidth + 12; // +12 for gap
+    }
+    
+    // If width is 0, use fallback
+    if (totalWidth === 0) {
+      totalWidth = 800; // fallback width
+    }
+    
+    let animationId = null;
+    let startTime = null;
+    const duration = 15000; // 15 seconds for full loop
+    
+    const animate = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = (elapsed % duration) / duration;
+      
+      const translateX = progress * totalWidth;
+      marquee.style.transform = `translateX(-${translateX}px)`;
+      
+      animationId = requestAnimationFrame(animate);
+    };
+    
+    // Start animation after a short delay to ensure DOM is ready
+    const timeoutId = setTimeout(() => {
+      animationId = requestAnimationFrame(animate);
+    }, 200);
+    
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+      clearTimeout(timeoutId);
+    };
+  }, [quickActions]);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -135,16 +190,17 @@ const AdminDashboard = () => {
         datasets: [
           {
             data: [published, draft],
-            backgroundColor: ['#89D7B7', '#1A312C/20'],
-            borderColor: ['#89D7B7', '#1A312C/10'],
+            backgroundColor: ['#89D7B7', '#428475'],
+            borderColor: ['#89D7B7', '#428475'],
             borderWidth: 2,
+            hoverBackgroundColor: ['#7BC8A8', '#3A7A6D'],
           }
         ]
       });
       
       const recent = allResponses
         .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
-        .slice(0, 5)
+        .slice(0, 10)
         .map(r => ({
           action: `Response recorded for quiz`,
           time: new Date(r.submitted_at).toLocaleString(),
@@ -234,9 +290,47 @@ const AdminDashboard = () => {
         </button>
       </div>
 
-      {/* ✅ AUTO-SLIDE STATS CARDS */}
+      {/* Quick Actions - Marquee Loop Inside Box */}
+      <div className="glass-card p-4 overflow-hidden">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-medium text-[#1A312C]/50">Quick Actions</span>
+          <div className="flex-1 h-px bg-[#428475]/10" />
+        </div>
+        
+        <div className="relative overflow-hidden">
+          <div 
+            ref={marqueeRef}
+            className="flex gap-3 whitespace-nowrap will-change-transform"
+            style={{ display: 'flex', gap: '12px' }}
+          >
+            {/* Triple the items for seamless loop */}
+            {[...quickActions, ...quickActions, ...quickActions].map((action, index) => (
+              <button
+                key={index}
+                onClick={() => navigate(action.path)}
+                className={`
+                  flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300
+                  hover:scale-105 hover:shadow-lg flex-shrink-0
+                  border border-white/10
+                `}
+                style={{
+                  background: `rgba(26, 49, 44, 0.4)`,
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  borderColor: `${action.color}30`,
+                  minWidth: 'auto',
+                }}
+              >
+                <FontAwesomeIcon icon={action.icon} style={{ color: action.color }} className="text-sm sm:text-base" />
+                <span className="text-xs sm:text-sm font-medium text-white/90">{action.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Auto-slide Stats Cards */}
       <div className="relative">
-        {/* Mobile: Single Slide / Desktop: Grid */}
         <div className="block md:hidden">
           <div className="relative overflow-hidden rounded-xl">
             <AnimatePresence mode="wait">
@@ -268,7 +362,6 @@ const AdminDashboard = () => {
                     </p>
                   </div>
                 </div>
-                {/* Progress bar */}
                 <div className="mt-4 h-1 w-full bg-[#1A312C]/10 rounded-full overflow-hidden">
                   <motion.div
                     className="h-full rounded-full"
@@ -282,7 +375,6 @@ const AdminDashboard = () => {
               </motion.div>
             </AnimatePresence>
 
-            {/* Navigation dots */}
             <div className="flex justify-center gap-2 mt-4">
               {statCards.map((_, index) => (
                 <button
@@ -295,7 +387,6 @@ const AdminDashboard = () => {
               ))}
             </div>
 
-            {/* Arrows */}
             <button
               onClick={prevSlide}
               className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/80 shadow-lg flex items-center justify-center hover:bg-white transition-colors z-10"
@@ -311,7 +402,6 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Desktop: Grid View */}
         <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {statCards.map((stat, index) => (
             <motion.div
@@ -321,9 +411,7 @@ const AdminDashboard = () => {
               transition={{ delay: index * 0.1 }}
               className="glass-card p-6 relative overflow-hidden group"
             >
-              {/* Gradient overlay on hover */}
               <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500 rounded-xl`} />
-              
               <div className="flex items-center justify-between mb-4">
                 <div 
                   className="w-12 h-12 rounded-xl flex items-center justify-center"
@@ -331,7 +419,6 @@ const AdminDashboard = () => {
                 >
                   <FontAwesomeIcon icon={stat.icon} style={{ color: stat.color }} className="text-xl" />
                 </div>
-                {/* Small indicator dot */}
                 <div className="w-2 h-2 rounded-full" style={{ background: stat.color }} />
               </div>
               <p className="text-3xl font-bold text-[#1A312C]">{stat.value}</p>
@@ -367,7 +454,17 @@ const AdminDashboard = () => {
               data={pieData} 
               options={{ 
                 responsive: true, 
-                plugins: { legend: { position: 'bottom' } } 
+                plugins: { 
+                  legend: { 
+                    position: 'bottom',
+                    labels: {
+                      padding: 16,
+                      usePointStyle: true,
+                      pointStyle: 'circle',
+                    }
+                  } 
+                },
+                cutout: '60%',
               }} 
               height={200} 
             />
@@ -377,10 +474,10 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Recent Activity */}
+      {/* Scrollable Recent Activity */}
       <div className="glass-card p-6">
         <h3 className="font-semibold text-[#1A312C] mb-4">Recent Activity</h3>
-        <div className="space-y-3">
+        <div className="max-h-48 overflow-y-auto space-y-3 pr-2">
           {recentActivity.map((activity, index) => (
             <div key={index} className="flex items-center gap-3 pb-3 border-b border-[#428475]/10 last:border-0 last:pb-0">
               <div className="w-2 h-2 rounded-full mt-1 flex-shrink-0 bg-[#428475]" />
@@ -391,6 +488,11 @@ const AdminDashboard = () => {
             </div>
           ))}
         </div>
+        {recentActivity.length > 5 && (
+          <p className="text-xs text-[#1A312C]/30 mt-3 text-center">
+            Scroll to see more activity
+          </p>
+        )}
       </div>
     </div>
   );

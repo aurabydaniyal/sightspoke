@@ -22,7 +22,7 @@ const AIInsights = ({ quizId, quizTitle }) => {
     totalResponses: 0,
     totalChats: 0,
     avgLatency: '—',
-    mostSelected: null  // ✅ Changed to object with image data
+    mostSelected: null
   });
 
   useEffect(() => {
@@ -40,12 +40,17 @@ const AIInsights = ({ quizId, quizTitle }) => {
           setAnalysis(latest.content.analysis);
         }
         if (latest.content) {
-          // ✅ Extract most selected image with details
           const mostSelected = latest.content.most_selected || null;
+          // ✅ FIX: Round avgLatency to 2 decimal places
+          const avgLatency = latest.content.avg_latency;
+          const formattedLatency = avgLatency !== undefined && avgLatency !== null && avgLatency !== '—' 
+            ? parseFloat(avgLatency).toFixed(2) 
+            : '—';
+          
           setStats({
             totalResponses: latest.content.total_responses || 0,
             totalChats: latest.content.chat_count || 0,
-            avgLatency: latest.content.avg_latency || '—',
+            avgLatency: formattedLatency,
             mostSelected: mostSelected
           });
         }
@@ -64,12 +69,17 @@ const AIInsights = ({ quizId, quizTitle }) => {
       const result = await analyzeQuizResponses(quizId);
       if (result && result.analysis) {
         setAnalysis(result.analysis);
-        // ✅ Extract most selected from result
         const mostSelected = result.most_selected || null;
+        // ✅ FIX: Round avgLatency to 2 decimal places
+        const avgLatency = result.avg_latency;
+        const formattedLatency = avgLatency !== undefined && avgLatency !== null && avgLatency !== '—' 
+          ? parseFloat(avgLatency).toFixed(2) 
+          : '—';
+        
         setStats({
           totalResponses: result.total_responses || 0,
           totalChats: result.chat_history?.length || 0,
-          avgLatency: result.avg_latency || '—',
+          avgLatency: formattedLatency,
           mostSelected: mostSelected
         });
         success('AI analysis generated!');
@@ -196,8 +206,8 @@ Most Selected: ${stats.mostSelected?.title || stats.mostSelected?.filename || 'N
           </div>
         </div>
 
-        {/* ✅ Most Selected Image Card */}
-        {stats.mostSelected && (
+        {/* ✅ Most Selected Image Card - FIXED with image display */}
+        {stats.mostSelected && stats.mostSelected.url && (
           <div className="glass-card p-4">
             <h4 className="font-semibold text-[#1A312C] mb-3 flex items-center gap-2">
               <FontAwesomeIcon icon={faImage} className="text-[#89D7B7]" />
@@ -222,7 +232,7 @@ Most Selected: ${stats.mostSelected?.title || stats.mostSelected?.filename || 'N
                   {stats.mostSelected.description || 'No description'}
                 </p>
                 <p className="text-xs text-[#428475] font-medium mt-1">
-                  Selected {stats.mostSelected.selection_count} times ({stats.mostSelected.percentage}%)
+                  Selected {stats.mostSelected.selection_count || 0} times ({stats.mostSelected.percentage || 0}%)
                 </p>
               </div>
             </div>

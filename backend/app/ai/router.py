@@ -42,22 +42,19 @@ async def chat_with_participant(
     print(f"  quiz_id: {request.quiz_id}")
     print(f"  participant_token_id: {request.participant_token_id}")
     
-    # ✅ STEP 1: Find the token by its STRING value in the 'token' column
     token = db.query(ParticipantToken).filter(
-        ParticipantToken.token == request.participant_token_id  # ← Search by the STRING column
+        ParticipantToken.token == request.participant_token_id
     ).first()
     
     if not token:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
     
-    # ✅ STEP 2: Now you have the UUID from token.id
-    print(f"✅ Found token UUID: {token.id}")  # ← This is the UUID!
+    print(f"✅ Found token UUID: {token.id}")
     
-    # ✅ STEP 3: Pass the UUID to the analyzer
     analyzer = AIAnalyzer()
     response = await analyzer.generate_participant_chat_response(
         quiz_id=request.quiz_id,
-        participant_token_id=token.id,  # ← Pass the UUID, not the string!
+        participant_token_id=token.id,
         message=request.message,
         db=db,
         chat_history=request.chat_history or []
@@ -168,3 +165,38 @@ async def get_chat_logs(
         }
         for log in logs
     ]
+
+# ✅ NEW ENDPOINT: Combined Chat Summary
+@router.post("/combined-chat-summary")
+async def generate_combined_chat_summary(
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """Generate a combined summary of all participant chats for a quiz"""
+    
+    quiz_id = request.get("quiz_id")
+    if not quiz_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="quiz_id is required")
+    
+    analyzer = AIAnalyzer()
+    try:
+        result = await analyzer.generate_combined_chat_summary(
+            quiz_id=quiz_id,
+            db=db
+        )
+        
+        # ✅ Save as AI insight
+        from models import AIInsight
+        insight = AIInsight(
+            quiz_id=quiz_id,
+            participant_token_id=None,
+            insight_type="combined_chat_summary",
+            content=result
+        )
+        db.add(insight)
+        db.commit()
+        
+        return result
+    except Exception as e:
+        print(f"❌ Combined chat summary error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

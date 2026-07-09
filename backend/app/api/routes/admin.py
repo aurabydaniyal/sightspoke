@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from uuid import UUID
-from typing import List, Optional  # ✅ ADD Optional HERE
+from typing import List, Optional
 import os
 import shutil
 
@@ -29,12 +29,10 @@ async def admin_login(
     login_data: AdminLogin,
     db: Session = Depends(get_db)
 ):
-    # DEBUG: Print incoming request
     print("\n" + "=" * 50)
     print("🔍 LOGIN ATTEMPT")
     print(f"Password received: '{login_data.password}'")
     
-    # Query admin from database
     admin = db.query(AdminUser).filter(
         AdminUser.username == "admin",
         AdminUser.is_active == True
@@ -48,7 +46,6 @@ async def admin_login(
     print(f"Stored hash from DB: '{admin.password_hash}'")
     print(f"Stored hash length: {len(admin.password_hash)}")
     
-    # Call verify_password
     is_valid = verify_password(login_data.password, admin.password_hash)
     print(f"verify_password result: {is_valid}")
     
@@ -66,7 +63,6 @@ async def admin_login(
     print("=" * 50 + "\n")
     
     return token_response
-
 
 # ============================================================
 # QUIZ MANAGEMENT
@@ -93,13 +89,11 @@ async def create_quiz(
     db.refresh(quiz)
     return quiz
 
-
 @router.get("/quizzes", response_model=List[QuizResponse])
 async def get_all_quizzes(
     db: Session = Depends(get_db)
 ):
     return db.query(Quiz).all()
-
 
 @router.get("/quizzes/{quiz_id}", response_model=QuizResponse)
 async def get_quiz(
@@ -110,7 +104,6 @@ async def get_quiz(
     if not quiz:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quiz not found")
     return quiz
-
 
 @router.put("/quizzes/{quiz_id}", response_model=QuizResponse)
 async def update_quiz(
@@ -129,7 +122,6 @@ async def update_quiz(
     db.refresh(quiz)
     return quiz
 
-
 @router.delete("/quizzes/{quiz_id}")
 async def delete_quiz(
     quiz_id: UUID,
@@ -142,7 +134,6 @@ async def delete_quiz(
     db.delete(quiz)
     db.commit()
     return {"message": "Quiz deleted successfully"}
-
 
 # ============================================================
 # QUIZ PAGES
@@ -169,14 +160,12 @@ async def add_page_to_quiz(
     db.refresh(page)
     return page
 
-
 @router.get("/quizzes/{quiz_id}/pages", response_model=List[QuizPageResponse])
 async def get_quiz_pages(
     quiz_id: UUID,
     db: Session = Depends(get_db)
 ):
     return db.query(QuizPage).filter(QuizPage.quiz_id == quiz_id).order_by(QuizPage.page_number).all()
-
 
 @router.put("/quizzes/{quiz_id}/pages/{page_id}")
 async def update_quiz_page(
@@ -201,7 +190,6 @@ async def update_quiz_page(
     db.refresh(page)
     return page
 
-
 @router.delete("/quizzes/{quiz_id}/pages/{page_id}")
 async def delete_quiz_page(
     quiz_id: UUID,
@@ -219,7 +207,6 @@ async def delete_quiz_page(
     db.delete(page)
     db.commit()
     return {"message": "Page deleted successfully"}
-
 
 # ============================================================
 # TOKENS
@@ -262,7 +249,6 @@ async def generate_tokens(
     
     return {"message": f"{count} tokens generated", "links": links}
 
-
 @router.get("/tokens/{quiz_id}")
 async def get_all_tokens(
     quiz_id: UUID,
@@ -282,7 +268,6 @@ async def get_all_tokens(
         for t in tokens
     ]
 
-
 # ============================================================
 # IMAGE MANAGEMENT
 # ============================================================
@@ -294,28 +279,23 @@ async def upload_image(
     description: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    # Validate file type
     if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File type not allowed. Allowed types: {settings.ALLOWED_IMAGE_TYPES}"
         )
     
-    # Create upload directory
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     
-    # Generate unique filename
     file_extension = os.path.splitext(file.filename)[1]
     unique_filename = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{file.filename}"
     file_path = os.path.join(settings.UPLOAD_DIR, unique_filename)
     
-    # Save file
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
     file_size = os.path.getsize(file_path)
     
-    # Create image record with title and description
     image = Image(
         filename=unique_filename,
         file_path=file_path,
@@ -331,13 +311,11 @@ async def upload_image(
     
     return image
 
-
 @router.get("/images", response_model=List[ImageResponse])
 async def get_all_images(
     db: Session = Depends(get_db)
 ):
     return db.query(Image).all()
-
 
 @router.get("/images/{image_id}", response_model=ImageResponse)
 async def get_image(
@@ -349,7 +327,6 @@ async def get_image(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     return image
 
-
 @router.delete("/images/{image_id}")
 async def delete_image(
     image_id: UUID,
@@ -359,14 +336,12 @@ async def delete_image(
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     
-    # Delete file from disk
     if os.path.exists(image.file_path):
         os.remove(image.file_path)
     
     db.delete(image)
     db.commit()
     return {"message": "Image deleted successfully"}
-
 
 # ============================================================
 # QUIZ INSIGHTS (Image Selection Statistics)
@@ -387,7 +362,7 @@ async def get_quiz_insights(
     image_ids = [pi.image_id for pi in page_images]
     images = db.query(Image).filter(Image.id.in_(image_ids)).all()
     
-    # ✅ Create image mapping with titles
+    # ✅ Create image mapping with titles and descriptions
     image_map = {}
     for img in images:
         image_map[str(img.id)] = {
@@ -398,7 +373,7 @@ async def get_quiz_insights(
             "mime_type": img.mime_type
         }
     
-    # ✅ Count selections with image titles
+    # ✅ Count selections with image titles and descriptions
     image_stats = {}
     for img in images:
         count = db.query(Response).filter(
@@ -406,7 +381,6 @@ async def get_quiz_insights(
             Response.selected_image_id == img.id
         ).count()
         
-        # ✅ Use title instead of ID
         img_id = str(img.id)
         image_stats[img_id] = {
             "id": img_id,
@@ -423,7 +397,7 @@ async def get_quiz_insights(
         "quiz_id": str(quiz_id),
         "total_responses": len(responses),
         "image_stats": image_stats,
-        "image_map": image_map  # ✅ Include for reference
+        "image_map": image_map
     }
 
 # ============================================================
@@ -446,7 +420,6 @@ async def add_image_to_page(
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
     
-    # Check if already linked
     existing = db.query(PageImage).filter(
         PageImage.page_id == page_id,
         PageImage.image_id == image_id
@@ -466,7 +439,6 @@ async def add_image_to_page(
     db.refresh(page_image)
     return {"message": "Image added to page successfully"}
 
-
 @router.delete("/pages/{page_id}/images/{image_id}")
 async def remove_image_from_page(
     page_id: UUID,
@@ -484,7 +456,6 @@ async def remove_image_from_page(
     db.delete(page_image)
     db.commit()
     return {"message": "Image removed from page successfully"}
-
 
 # ============================================================
 # RESPONSES
@@ -512,7 +483,6 @@ async def get_quiz_responses(
             "submitted_at": response.submitted_at.isoformat() if response.submitted_at else None
         })
     return export_data
-
 
 @router.get("/responses/export/{quiz_id}")
 async def export_responses_json(
