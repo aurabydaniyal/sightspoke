@@ -1,20 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLink, faCopy, faCheck, faSync, faPlus, faMinus } from '@fortawesome/free-solid-svg-icons';
+import { faLink, faCopy, faCheck, faSync, faPlus, faMinus, faBolt, faLock, faUnlock, faClipboard, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { adminApi } from '../../api/axiosConfig';
-import { useAlert } from '../../components/common/CustomAlert';
+import { useAlert } from '../common/CustomAlert';
 
 const TokenGenerator = () => {
-  const { success, error, warning } = useAlert();
   const { id } = useParams();
   const quizId = id;
+  const { success, error, warning, info } = useAlert();
 
   const [count, setCount] = useState(5);
   const [expiryDays, setExpiryDays] = useState(7);
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [isLocked, setIsLocked] = useState(true);
+  const [showQueue, setShowQueue] = useState(false);
+
+  // Load tokens on mount
+  useEffect(() => {
+    loadTokens();
+  }, [quizId]);
+
+  const loadTokens = async () => {
+    setLoading(true);
+    try {
+      const response = await adminApi.get(`/tokens/${quizId}`);
+      const tokenData = response.data || [];
+      // Filter: only show unused, non-expired tokens
+      const available = tokenData.filter(t => !t.is_used && !t.is_expired);
+      setTokens(available);
+      setShowQueue(available.length > 0);
+    } catch (err) {
+      console.error('Failed to load tokens:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!quizId || quizId === 'undefined' || quizId === 'create') {
     return (
@@ -31,32 +56,69 @@ const TokenGenerator = () => {
   }
 
   const generateTokens = async () => {
-    setLoading(true);
+    setGenerating(true);
     try {
       const response = await adminApi.post(`/quizzes/${quizId}/tokens`, null, {
         params: { count, expiry_days: expiryDays }
       });
-      setTokens(response.data.links);
+      const newTokens = response.data.links || [];
+      setTokens([...tokens, ...newTokens]);
+      setShowQueue(true);
       success(`${count} tokens generated!`);
-    } catch (error) {
+    } catch (err) {
       error('Failed to generate tokens');
-      console.error('Token error:', error.response?.data || error.message);
+      console.error('Token error:', err.response?.data || err.message);
     } finally {
-      setLoading(false);
+      setGenerating(false);
     }
   };
 
-  const copyToClipboard = (text, index) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-    success('Copied!');
+  const copyToken = async (token, index) => {
+    try {
+      await navigator.clipboard.writeText(token.url);
+      setCopiedIndex(index);
+      
+      // Remove from queue (pop from front)
+      const updated = [...tokens];
+      updated.splice(index, 1);
+      setTokens(updated);
+      
+      // Mark as used in database
+      await adminApi.put(`/tokens/${token.token}/use`);
+      
+      success('Token copied and used!');
+      setTimeout(() => setCopiedIndex(null), 2000);
+      
+      // Hide queue if empty
+      if (updated.length === 0) {
+        setShowQueue(false);
+      }
+    } catch (err) {
+      error('Failed to copy token');
+    }
   };
 
-  const copyAll = () => {
-    const all = tokens.map(t => t.url).join('\n');
-    navigator.clipboard.writeText(all);
-    success('All links copied!');
+  const copyAllTokens = async () => {
+    if (tokens.length === 0) {
+      warning('No tokens to copy');
+      return;
+    }
+    
+    try {
+      const allUrls = tokens.map(t => t.url).join('\n');
+      await navigator.clipboard.writeText(allUrls);
+      
+      // Mark all as used
+      for (const token of tokens) {
+        await adminApi.put(`/tokens/${token.token}/use`);
+      }
+      
+      success(`Copied ${tokens.length} tokens!`);
+      setTokens([]);
+      setShowQueue(false);
+    } catch (err) {
+      error('Failed to copy all tokens');
+    }
   };
 
   const handleCountChange = (delta) => {
@@ -75,12 +137,32 @@ const TokenGenerator = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-xl font-bold text-[#1A312C]">Generate Participant Tokens</h2>
-        <span className="text-sm text-[#1A312C]/40">Quiz ID: {quizId}</span>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-[#1A312C]">Token Management</h2>
+          <p className="text-[#1A312C]/40 text-sm">Quiz ID: {quizId}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-[#1A312C]/40">
+            {tokens.length} tokens available
+          </span>
+          <button
+            onClick={() => setIsLocked(!isLocked)}
+            className={`btn-glass !py-1.5 !px-3 text-sm ${
+              isLocked ? 'text-[#428475]' : 'text-[#89D7B7]'
+            }`}
+          >
+            <FontAwesomeIcon icon={isLocked ? faLock : faUnlock} />
+            {isLocked ? ' Locked' : ' Unlocked'}
+          </button>
+        </div>
       </div>
 
+      {/* Generator Section */}
       <div className="glass-card p-6">
+        <h3 className="font-semibold text-[#1A312C] mb-4">Generate Tokens</h3>
+        
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="text-sm font-medium text-[#1A312C]/60">Number of Tokens</label>
@@ -137,37 +219,119 @@ const TokenGenerator = () => {
 
         <button
           onClick={generateTokens}
-          disabled={loading}
+          disabled={generating}
           className="btn-neon w-full justify-center mt-6 !py-3"
         >
-          <FontAwesomeIcon icon={loading ? faSync : faLink} className={loading ? 'animate-spin' : ''} />
-          {loading ? 'Generating...' : `Generate ${count} Tokens`}
+          <FontAwesomeIcon icon={generating ? faSync : faBolt} className={generating ? 'animate-spin' : ''} />
+          {generating ? 'Generating...' : `Generate ${count} Tokens`}
         </button>
       </div>
 
-      {tokens.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-[#1A312C]">Generated Tokens ({tokens.length})</h3>
-            <button onClick={copyAll} className="btn-glass !py-1.5 !px-3 text-sm">
-              <FontAwesomeIcon icon={faCopy} /> Copy All
-            </button>
-          </div>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {tokens.map((token, index) => (
-              <div key={index} className="glass-card p-3 flex items-center gap-3 hover:border-[#428475]/30 transition-colors">
-                <span className="text-sm font-medium text-[#428475] min-w-[80px]">{token.admin_label}</span>
-                <code className="flex-1 text-xs bg-[#1A312C]/5 px-3 py-1.5 rounded font-mono truncate">{token.url}</code>
-                <span className="text-xs text-[#1A312C]/40 whitespace-nowrap">Expires: {new Date(token.expires_at).toLocaleDateString()}</span>
-                <button
-                  onClick={() => copyToClipboard(token.url, index)}
-                  className="w-8 h-8 rounded-lg hover:bg-[#428475]/10 transition-colors flex items-center justify-center"
-                >
-                  <FontAwesomeIcon icon={copiedIndex === index ? faCheck : faCopy} className={copiedIndex === index ? 'text-[#89D7B7]' : 'text-[#428475]'} />
-                </button>
+      {/* ✅ QUEUE BOX - Only shows when tokens exist */}
+      <AnimatePresence>
+        {showQueue && tokens.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="glass-card p-6 border-2 border-[#428475]/30"
+          >
+            {/* Queue Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#428475]/20 flex items-center justify-center">
+                  <FontAwesomeIcon icon={faBolt} className="text-[#89D7B7]" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-[#1A312C]">Token Queue</h3>
+                  <p className="text-xs text-[#1A312C]/40">
+                    {tokens.length} token{tokens.length > 1 ? 's' : ''} available
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
+              
+              {/* Copy All Button */}
+              <button
+                onClick={copyAllTokens}
+                disabled={isLocked}
+                className={`btn-glass !py-1.5 !px-3 text-sm flex items-center gap-2 ${
+                  isLocked ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <FontAwesomeIcon icon={faClipboard} />
+                Copy All
+              </button>
+            </div>
+
+            {/* Locked State Overlay */}
+            {isLocked ? (
+              <div className="text-center py-8 text-[#1A312C]/40">
+                <FontAwesomeIcon icon={faLock} className="text-4xl mb-3 block" />
+                <p className="text-sm font-medium">Queue is Locked</p>
+                <p className="text-xs">Click the lock button above to access tokens</p>
+              </div>
+            ) : (
+              /* Queue Items - Stack style (LIFO) */
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {tokens.map((token, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-[#1A312C]/5 hover:bg-[#1A312C]/10 transition-colors border border-[#428475]/10"
+                  >
+                    {/* Queue Position */}
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#428475] text-white text-xs font-bold flex-shrink-0">
+                      {index + 1}
+                    </div>
+                    
+                    {/* Token URL */}
+                    <code className="flex-1 text-xs bg-[#FFF4E1] px-3 py-1.5 rounded font-mono truncate">
+                      {token.url}
+                    </code>
+                    
+                    {/* Expiry */}
+                    <span className="text-xs text-[#1A312C]/40 whitespace-nowrap">
+                      {new Date(token.expires_at).toLocaleDateString()}
+                    </span>
+                    
+                    {/* Copy Button - Pops from queue */}
+                    <button
+                      onClick={() => copyToken(token, index)}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                        copiedIndex === index 
+                          ? 'bg-[#89D7B7] text-[#1A312C]' 
+                          : 'bg-[#428475] text-white hover:bg-[#89D7B7] hover:text-[#1A312C]'
+                      }`}
+                      title="Copy and remove from queue"
+                    >
+                      <FontAwesomeIcon icon={copiedIndex === index ? faCheck : faCopy} />
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {/* Queue Footer */}
+            <div className="mt-4 pt-3 border-t border-[#428475]/10 flex items-center justify-between text-xs text-[#1A312C]/40">
+              <span>
+                {isLocked ? '🔒 Locked' : '🔓 Unlocked'} · {tokens.length} tokens in queue
+              </span>
+              <span>
+                First in, first out
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* No Tokens Message */}
+      {!showQueue && tokens.length === 0 && !loading && (
+        <div className="glass-card p-8 text-center border-2 border-dashed border-[#428475]/20">
+          <FontAwesomeIcon icon={faLink} className="text-4xl text-[#428475]/30 mb-3" />
+          <p className="text-[#1A312C]/50">No tokens available</p>
+          <p className="text-xs text-[#1A312C]/30">Generate tokens to fill the queue</p>
         </div>
       )}
     </div>

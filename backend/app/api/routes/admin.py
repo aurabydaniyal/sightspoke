@@ -304,6 +304,8 @@ async def upload_image(
     description: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
+    """Upload image with title and description"""
+    
     if file.content_type not in settings.ALLOWED_IMAGE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -321,6 +323,7 @@ async def upload_image(
     
     file_size = os.path.getsize(file_path)
     
+    # ✅ Create image with title and description
     image = Image(
         filename=unique_filename,
         file_path=file_path,
@@ -328,7 +331,7 @@ async def upload_image(
         mime_type=file.content_type,
         title=title or "",
         description=description or "",
-        img_metadata={}
+        img_metadata={"source": "admin_upload"}
     )
     db.add(image)
     db.commit()
@@ -539,3 +542,24 @@ async def export_responses_json(
         "total_responses": len(export_data),
         "data": export_data
     }
+
+@router.put("/tokens/{token}/use")
+async def mark_token_as_used(
+    token: str,
+    db: Session = Depends(get_db)
+):
+    """Mark a token as used (for queue system)"""
+    
+    token_record = db.query(ParticipantToken).filter(
+        ParticipantToken.token == token,
+        ParticipantToken.is_used == False
+    ).first()
+    
+    if not token_record:
+        raise HTTPException(status_code=404, detail="Token not found or already used")
+    
+    token_record.is_used = True
+    token_record.used_at = datetime.now(timezone.utc)
+    db.commit()
+    
+    return {"message": "Token marked as used"}

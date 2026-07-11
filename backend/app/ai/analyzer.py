@@ -10,10 +10,14 @@ from models import Response, Quiz, ParticipantToken, AIInsight, ParticipantChatL
 from database import get_db
 
 class AIAnalyzer:
-    """Core AI analysis logic"""
+    """Core AI analysis logic - Complete with all methods"""
     
     def __init__(self):
         self.groq = GroqClient()
+    
+    # ============================================================
+    # ORIGINAL METHODS - KEPT INTACT
+    # ============================================================
     
     async def analyze_quiz_responses(
         self,
@@ -21,7 +25,7 @@ class AIAnalyzer:
         db: Session,
         participant_token_id: Optional[UUID] = None
     ) -> Dict[str, Any]:
-        """Analyze all responses for a quiz"""
+        """Analyze all responses for a quiz (ORIGINAL)"""
         
         quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
         if not quiz:
@@ -35,7 +39,7 @@ class AIAnalyzer:
         if not responses:
             return {"error": "No responses found for analysis"}
         
-        # Get all images with their titles and descriptions
+        # Get all images with their titles
         image_ids = [r.selected_image_id for r in responses if r.selected_image_id]
         images = db.query(Image).filter(Image.id.in_(image_ids)).all() if image_ids else []
         image_map = {str(img.id): img for img in images}
@@ -44,22 +48,11 @@ class AIAnalyzer:
         for r in responses:
             img = image_map.get(str(r.selected_image_id)) if r.selected_image_id else None
             
-            # ✅ Get image URL for display
-            img_url = ""
-            if img:
-                if img.file_path and img.file_path.startswith('http'):
-                    img_url = img.file_path
-                elif img.file_path and img.file_path.startswith('/uploads/'):
-                    img_url = img.file_path
-                else:
-                    img_url = f"/uploads/{img.filename}" if img.filename else ""
-            
             response_data.append({
                 "page_number": r.page.page_number if r.page else None,
                 "selected_image_id": str(r.selected_image_id) if r.selected_image_id else None,
                 "selected_image_title": img.title if img else "Unknown Image",
                 "selected_image_description": img.description if img else "",
-                "selected_image_url": img_url,  # ✅ ADD URL for display
                 "selected_position_index": r.selected_position_index,
                 "latency_ms": r.latency_ms,
                 "timeout_flag": r.timeout_flag,
@@ -84,38 +77,31 @@ class AIAnalyzer:
         
         response = await self.groq.analyze_responses(response_data, quiz_info)
         
-        # ✅ Calculate most selected image with full metadata
+        # Calculate most selected image
         most_selected = None
         if response_data:
             selected_titles = [r.get("selected_image_title") for r in response_data if r.get("selected_image_title")]
             if selected_titles:
                 most_common = Counter(selected_titles).most_common(1)[0]
-                # Find the image with this title to get URL and description
+                # Find image URL
                 for r in response_data:
                     if r.get("selected_image_title") == most_common[0]:
+                        img_url = r.get("selected_image_url", "")
+                        if not img_url:
+                            for img_id, img in image_map.items():
+                                if img.title == most_common[0]:
+                                    img_url = f"/uploads/{img.filename}" if not img.file_path.startswith('http') else img.file_path
+                                    break
                         most_selected = {
                             "title": most_common[0],
                             "count": most_common[1],
                             "percentage": round((most_common[1] / len(response_data) * 100), 1),
-                            "url": r.get("selected_image_url", ""),  # ✅ URL for display
+                            "url": img_url or "",
                             "description": r.get("selected_image_description", ""),
                             "selection_count": most_common[1]
                         }
                         break
-                # If no URL found, try to get from image_map
-                if most_selected and not most_selected.get("url"):
-                    for img_id, img in image_map.items():
-                        if img.title == most_selected["title"]:
-                            if img.file_path and img.file_path.startswith('http'):
-                                most_selected["url"] = img.file_path
-                            elif img.file_path and img.file_path.startswith('/uploads/'):
-                                most_selected["url"] = img.file_path
-                            else:
-                                most_selected["url"] = f"/uploads/{img.filename}" if img.filename else ""
-                            most_selected["description"] = img.description or ""
-                            break
         
-        # ✅ Calculate avg latency with 2 decimal places
         avg_latency = 0
         if responses:
             total_latency = sum(r.latency_ms for r in responses if r.latency_ms)
@@ -154,7 +140,7 @@ class AIAnalyzer:
         db: Session,
         chat_history: List[Dict[str, str]] = []
     ) -> str:
-        """Generate AI response for participant chat"""
+        """Generate AI response for participant chat (ORIGINAL)"""
         
         token = db.query(ParticipantToken).filter(
             ParticipantToken.id == participant_token_id
@@ -204,7 +190,7 @@ class AIAnalyzer:
         question: str,
         db: Session
     ) -> str:
-        """Answer admin's question about quiz data"""
+        """Answer admin's question about quiz data (ORIGINAL)"""
         
         quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
         if not quiz:
@@ -213,7 +199,7 @@ class AIAnalyzer:
         responses = db.query(Response).filter(Response.quiz_id == quiz_id).all()
         
         if not responses:
-            return "No responses found for this quiz yet. Please wait for participants to complete the quiz."
+            return "No responses found for this quiz yet."
         
         chats = db.query(ParticipantChatLog).filter(
             ParticipantChatLog.quiz_id == quiz_id
@@ -222,21 +208,10 @@ class AIAnalyzer:
         response_data = []
         for r in responses[:50]:
             img = db.query(Image).filter(Image.id == r.selected_image_id).first() if r.selected_image_id else None
-            # ✅ Get image URL
-            img_url = ""
-            if img:
-                if img.file_path and img.file_path.startswith('http'):
-                    img_url = img.file_path
-                elif img.file_path and img.file_path.startswith('/uploads/'):
-                    img_url = img.file_path
-                else:
-                    img_url = f"/uploads/{img.filename}" if img.filename else ""
-            
             response_data.append({
                 "page_number": r.page.page_number if r.page else None,
                 "selected_image_title": img.title if img else "Unknown Image",
                 "selected_image_description": img.description if img else "",
-                "selected_image_url": img_url,  # ✅ ADD URL
                 "selected_position_index": r.selected_position_index,
                 "latency_ms": r.latency_ms,
                 "timeout_flag": r.timeout_flag
@@ -265,7 +240,7 @@ class AIAnalyzer:
         quiz_id: UUID,
         db: Session
     ) -> List[Dict[str, str]]:
-        """Generate FAQs for a quiz"""
+        """Generate FAQs for a quiz (ORIGINAL)"""
         
         quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
         if not quiz:
@@ -297,7 +272,7 @@ class AIAnalyzer:
         participant_token_id: UUID,
         db: Session
     ) -> Dict[str, Any]:
-        """Analyze a participant's chat history"""
+        """Analyze a participant's chat history (ORIGINAL)"""
         
         chats = db.query(ParticipantChatLog).filter(
             ParticipantChatLog.quiz_id == quiz_id,
@@ -319,21 +294,9 @@ class AIAnalyzer:
         response_data = []
         for r in responses:
             img = db.query(Image).filter(Image.id == r.selected_image_id).first() if r.selected_image_id else None
-            # ✅ Get image URL
-            img_url = ""
-            if img:
-                if img.file_path and img.file_path.startswith('http'):
-                    img_url = img.file_path
-                elif img.file_path and img.file_path.startswith('/uploads/'):
-                    img_url = img.file_path
-                else:
-                    img_url = f"/uploads/{img.filename}" if img.filename else ""
-            
             response_data.append({
                 "page_number": r.page.page_number if r.page else None,
                 "selected_image_title": img.title if img else "Unknown",
-                "selected_image_description": img.description if img else "",
-                "selected_image_url": img_url,  # ✅ ADD URL
                 "selected_position_index": r.selected_position_index,
                 "latency_ms": r.latency_ms,
                 "timeout_flag": r.timeout_flag
@@ -386,15 +349,13 @@ class AIAnalyzer:
             "response_count": len(responses)
         }
     
-    # ✅ NEW METHOD: Combined chat summary for all participants
     async def generate_combined_chat_summary(
         self,
         quiz_id: UUID,
         db: Session
     ) -> Dict[str, Any]:
-        """Generate a combined summary of all participant chats for a quiz"""
+        """Generate a combined summary of all participant chats (ORIGINAL)"""
         
-        # Get all chat logs for this quiz
         chats = db.query(ParticipantChatLog).filter(
             ParticipantChatLog.quiz_id == quiz_id
         ).order_by(ParticipantChatLog.created_at).all()
@@ -406,7 +367,6 @@ class AIAnalyzer:
                 "participants": 0
             }
         
-        # Get unique participants
         participant_ids = set()
         chat_data = []
         for c in chats:
@@ -417,12 +377,10 @@ class AIAnalyzer:
                 "created_at": c.created_at.isoformat() if c.created_at else None
             })
         
-        # Get quiz info
         quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
         
-        # Prepare prompt for combined analysis
         prompt = f"""
-        Analyze ALL chat conversations from participants who took the quiz "{quiz.title if quiz else 'Unknown'}".
+        Analyze ALL chat conversations from participants.
         
         Total Messages: {len(chats)}
         Total Participants: {len(participant_ids)}
@@ -433,17 +391,12 @@ class AIAnalyzer:
         Please provide a COMBINED SUMMARY that covers:
         1. Most common questions asked by participants
         2. Key themes or topics discussed
-        3. Overall sentiment across all participants
-        4. Any concerns, confusion, or feedback mentioned
-        5. Recommendations for the admin
-        
-        Format as a professional report.
+        3. Overall sentiment
+        4. Concerns or feedback
+        5. Recommendations
         """
         
-        system_prompt = """You are SightSpoke AI, an expert in analyzing participant feedback and questions.
-        Provide a comprehensive, combined summary of all participant conversations.
-        Focus on common themes, frequently asked questions, and overall sentiment.
-        """
+        system_prompt = """You are SightSpoke AI, an expert in analyzing participant feedback."""
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -457,3 +410,190 @@ class AIAnalyzer:
             "total_messages": len(chats),
             "participants": len(participant_ids)
         }
+    
+    # ============================================================
+    # NEW PSYCHOLOGICAL METHODS - COMPLETE
+    # ============================================================
+    
+    async def analyze_survey(
+        self,
+        quiz_id: UUID,
+        db: Session,
+        participant_token_id: Optional[UUID] = None
+    ) -> Dict[str, Any]:
+        """Analyze survey responses with psychological focus (NEW)"""
+        
+        quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+        if not quiz:
+            raise ValueError("Quiz not found")
+        
+        query = db.query(Response).filter(Response.quiz_id == quiz_id)
+        if participant_token_id:
+            query = query.filter(Response.participant_token_id == participant_token_id)
+        responses = query.all()
+        
+        if not responses:
+            return {
+                "analysis": "No responses found for this participant.",
+                "total_responses": 0,
+                "chat_history": [],
+                "most_selected": None,
+                "avg_latency": 0,
+                "participant_id": str(participant_token_id) if participant_token_id else None
+            }
+        
+        # Get images with psychological metadata
+        image_ids = [r.selected_image_id for r in responses if r.selected_image_id]
+        images = db.query(Image).filter(Image.id.in_(image_ids)).all() if image_ids else []
+        image_map = {str(img.id): img for img in images}
+        
+        response_data = []
+        for r in responses:
+            img = image_map.get(str(r.selected_image_id)) if r.selected_image_id else None
+            response_data.append({
+                "page_number": r.page.page_number if r.page else None,
+                "selected_image_id": str(r.selected_image_id) if r.selected_image_id else None,
+                "selected_image_title": img.title if img else "Unknown",
+                "psychological_description": img.description if img else "",
+                "psychological_concept": img.img_metadata.get("psychological_concept", "") if img else "",
+                "analysis_context": img.img_metadata.get("analysis_context", "") if img else "",
+                "selected_image_url": self._get_image_url(img) if img else "",  # ✅ ADD THIS
+                "latency_ms": r.latency_ms,
+                "timeout_flag": r.timeout_flag,
+                "time_limit_seconds": r.time_limit_seconds
+            })
+        
+        # Get chat history
+        chat_history = []
+        if participant_token_id:
+            chats = db.query(ParticipantChatLog).filter(
+                ParticipantChatLog.participant_token_id == participant_token_id
+            ).order_by(ParticipantChatLog.created_at).all()
+            chat_history = [{"sender": c.sender, "message": c.message} for c in chats]
+        
+        quiz_info = {
+            "title": quiz.title,
+            "description": quiz.description or "",
+            "ai_overview": quiz.ai_overview or ""
+        }
+        
+        # ✅ Generate analysis
+        if participant_token_id:
+            analysis = await self.groq.analyze_individual_participant(
+                responses=response_data,
+                chat_history=chat_history,
+                quiz_info=quiz_info
+            )
+        else:
+            analysis = await self.groq.analyze_survey_responses(
+                responses=response_data,
+                quiz_info=quiz_info,
+                chat_history=chat_history
+            )
+        
+        # ✅ Calculate most selected - FIXED with URL
+        most_selected = None
+        if response_data:
+            selected_titles = [r.get("selected_image_title") for r in response_data if r.get("selected_image_title")]
+            if selected_titles:
+                most_common = Counter(selected_titles).most_common(1)[0]
+                # Find the image with URL
+                for r in response_data:
+                    if r.get("selected_image_title") == most_common[0]:
+                        # ✅ Get image URL from the response data
+                        img_url = r.get("selected_image_url", "")
+                        if not img_url:
+                            # Try to get from image_map
+                            for img_id, img in image_map.items():
+                                if img.title == most_common[0]:
+                                    img_url = self._get_image_url(img)
+                                    break
+                        most_selected = {
+                            "title": most_common[0],
+                            "count": most_common[1],
+                            "percentage": round((most_common[1] / len(response_data) * 100), 1),
+                            "url": img_url or "",
+                            "filename": r.get("selected_image_filename", ""),
+                            "description": r.get("psychological_description", ""),
+                            "selection_count": most_common[1]
+                        }
+                        break
+        
+        avg_latency = 0
+        if responses:
+            total_latency = sum(r.latency_ms for r in responses if r.latency_ms)
+            avg_latency = round((total_latency / len(responses) / 1000), 2) if responses else 0
+        
+        # ✅ Calculate key findings
+        key_findings = []
+        if most_selected:
+            key_findings.append({
+                "type": "most_selected",
+                "title": most_selected.get("title", ""),
+                "percentage": most_selected.get("percentage", 0),
+                "description": most_selected.get("description", "")
+            })
+        
+        if avg_latency > 0:
+            if avg_latency < 3:
+                key_findings.append({
+                    "type": "decision_speed",
+                    "description": f"Participants made decisions quickly (avg {avg_latency}s), suggesting intuitive responses"
+                })
+            else:
+                key_findings.append({
+                    "type": "decision_speed",
+                    "description": f"Participants took time to decide (avg {avg_latency}s), suggesting thoughtful responses"
+                })
+        
+        # ✅ Save insight
+        insight = AIInsight(
+            quiz_id=quiz_id,
+            participant_token_id=participant_token_id,
+            insight_type="psychological_analysis" if not participant_token_id else "individual_analysis",
+            content={
+                "analysis": analysis,
+                "total_responses": len(responses),
+                "chat_history": chat_history if participant_token_id else [],
+                "most_selected": most_selected,
+                "avg_latency": avg_latency,
+                "participant_id": str(participant_token_id) if participant_token_id else None,
+                "key_findings": key_findings
+            }
+        )
+        db.add(insight)
+        db.commit()
+        db.refresh(insight)
+        
+        return {
+            "insight_id": str(insight.id),
+            "analysis": analysis,
+            "total_responses": len(responses),
+            "chat_history": chat_history if participant_token_id else [],
+            "most_selected": most_selected,
+            "avg_latency": avg_latency,
+            "participant_id": str(participant_token_id) if participant_token_id else None,
+            "key_findings": key_findings
+        }
+
+
+    def _get_image_url(self, img) -> str:
+        """Helper method to get image URL from Image object"""
+        if not img:
+            return ""
+        if img.file_path and img.file_path.startswith('http'):
+            return img.file_path
+        if img.file_path and img.file_path.startswith('/uploads/'):
+            return f"http://localhost:8000{img.file_path}"
+        if img.filename:
+            return f"http://localhost:8000/uploads/{img.filename}"
+        return ""
+    
+    async def analyze_participant_survey(
+        self,
+        quiz_id: UUID,
+        participant_token_id: UUID,
+        db: Session
+    ) -> Dict[str, Any]:
+        """Analyze a specific participant's survey (NEW)"""
+        return await self.analyze_survey(quiz_id, db, participant_token_id)

@@ -84,7 +84,7 @@ const QuizEntry = () => {
             overlayContent={
               <div className="text-center p-6 w-full h-full flex flex-col items-center justify-center">
                 <div className="w-16 h-16 rounded-full bg-[#89D7B7]/20 flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                  <span className="text-3xl">🧠</span>
+                  <span className="text-3xl">⭐</span>
                 </div>
                 <h1 className="text-2xl font-bold text-[#FFF4E1] mb-2">
                   {quizInfo.title || 'Visual Preference Test'}
@@ -106,7 +106,7 @@ const QuizEntry = () => {
                   onClick={startQuiz}
                   className="btn-neon w-full justify-center py-2.5 text-sm"
                 >
-                  Start Quiz
+                  Start Survey
                   <FontAwesomeIcon icon={faArrowRight} className="ml-2" />
                 </button>
 

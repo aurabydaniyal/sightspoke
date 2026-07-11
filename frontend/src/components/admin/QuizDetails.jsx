@@ -5,13 +5,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faArrowLeft, faInfoCircle, faChartBar, faBrain, faComments,
   faFileAlt, faUsers, faClock, faCheckCircle, faMessage,
-  faUser, faRobot, faChevronDown, faChevronUp, faRefresh
+  faUser, faRobot, faChevronDown, faChevronUp,
+  faUserMd, faUserCheck
 } from '@fortawesome/free-solid-svg-icons';
 import { adminApi } from '../../api/axiosConfig';
+import { analyzeParticipant, getParticipantChatLogs } from '../../api/aiApi';
 import AIInsights from '../ai/AIInsights';
 import AIChat from '../ai/AIChat';
 import { useAlert } from '../common/CustomAlert';
-import toast from 'react-hot-toast';
 
 const QuizDetails = () => {
   const { id } = useParams();
@@ -21,9 +22,10 @@ const QuizDetails = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [responses, setResponses] = useState([]);
-  const [chatSummary, setChatSummary] = useState(null);
-  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [participants, setParticipants] = useState([]);
+  const [selectedParticipant, setSelectedParticipant] = useState(null);
+  const [participantAnalysis, setParticipantAnalysis] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [stats, setStats] = useState({
     totalResponses: 0,
     totalParticipants: 0,
@@ -43,12 +45,37 @@ const QuizDetails = () => {
 
       const responsesRes = await adminApi.get(`/quizzes/${id}/responses`);
       const data = responsesRes.data;
-      setResponses(data);
       
-      // ✅ Load combined chat summary
-      await loadChatSummary();
+      // Group by participant
+      const grouped = {};
+      data.forEach(r => {
+        if (!grouped[r.participant_token]) {
+          grouped[r.participant_token] = [];
+        }
+        grouped[r.participant_token].push(r);
+      });
       
-      // Calculate stats
+      // Get participant chat logs
+      const participantsList = [];
+      for (const [token, responses] of Object.entries(grouped)) {
+        try {
+          const chatRes = await getParticipantChatLogs(id, token);
+          participantsList.push({
+            token: token,
+            responseCount: responses.length,
+            chats: chatRes || []
+          });
+        } catch (e) {
+          participantsList.push({
+            token: token,
+            responseCount: responses.length,
+            chats: []
+          });
+        }
+      }
+      setParticipants(participantsList);
+      
+      // Stats
       const uniqueTokens = new Set(data.map(r => r.participant_token));
       let totalTime = 0;
       data.forEach(r => {
@@ -63,6 +90,7 @@ const QuizDetails = () => {
         completionRate: data.length > 0 ? Math.round((data.length / (uniqueTokens.size * 13)) * 100) : 0
       });
     } catch (err) {
+      console.error('Load quiz error:', err);
       error('Failed to load quiz details');
       navigate('/admin/quizzes');
     } finally {
@@ -70,52 +98,20 @@ const QuizDetails = () => {
     }
   };
 
-  const loadChatSummary = async () => {
+  const handleAnalyzeParticipant = async (token) => {
+    setAnalyzing(true);
+    setSelectedParticipant(token);
+    setParticipantAnalysis(null);
+    
     try {
-      // ✅ Try to get combined summary from AI insights
-      const insightsRes = await adminApi.get(`/ai/insights/${id}`);
-      const insights = insightsRes.data || [];
-      
-      // Find combined chat summary insight
-      const combinedInsight = insights.find(
-        c => c.insight_type === 'combined_chat_summary'
-      );
-      
-      if (combinedInsight) {
-        setChatSummary(combinedInsight.content);
-      } else {
-        // Check if there are any chat logs
-        const chatRes = await adminApi.get(`/ai/chat-logs/${id}`);
-        const logs = chatRes.data || [];
-        if (logs.length > 0) {
-          setChatSummary({
-            summary: 'Click "Generate Chat Summary" to analyze all participant conversations.',
-            total_messages: logs.length,
-            participants: new Set(logs.map(l => l.participant_token_id)).size
-          });
-        } else {
-          setChatSummary(null);
-        }
-      }
-    } catch (e) {
-      console.log('No chat summary found');
-      setChatSummary(null);
-    }
-  };
-
-  const generateChatSummary = async () => {
-    setGeneratingSummary(true);
-    try {
-      const response = await adminApi.post(`/ai/combined-chat-summary`, {
-        quiz_id: id
-      });
-      setChatSummary(response.data);
-      success('Chat summary generated!');
+      const response = await analyzeParticipant(id, token);
+      setParticipantAnalysis(response);
+      success('Participant analysis complete!');
     } catch (err) {
-      error('Failed to generate chat summary');
-      console.error('Chat summary error:', err);
+      console.error('Participant analysis error:', err);
+      error('Failed to analyze participant');
     } finally {
-      setGeneratingSummary(false);
+      setAnalyzing(false);
     }
   };
 
@@ -126,10 +122,9 @@ const QuizDetails = () => {
     { id: 'ai-chat', label: 'AI Chat', icon: faComments },
   ];
 
-  // ✅ Render Responses Tab Content with Combined Chat Summary
   const renderResponses = () => (
     <div className="space-y-6">
-      {/* Stats Cards */}
+      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="glass-card p-4 text-center">
           <p className="text-2xl font-bold text-[#1A312C]">{stats.totalResponses}</p>
@@ -149,38 +144,86 @@ const QuizDetails = () => {
         </div>
       </div>
 
-      {/* ✅ Combined Chat Summary */}
+      {/* Participants List */}
       <div className="glass-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-[#1A312C] flex items-center gap-2">
-            <FontAwesomeIcon icon={faMessage} className="text-[#89D7B7]" />
-            Combined Chat Summary
-          </h3>
-          <button
-            onClick={generateChatSummary}
-            disabled={generatingSummary}
-            className="btn-glass !py-1.5 !px-3 text-sm"
-          >
-            <FontAwesomeIcon icon={generatingSummary ? faRefresh : faRefresh} className={generatingSummary ? 'animate-spin' : ''} />
-            {generatingSummary ? 'Generating...' : 'Generate Summary'}
-          </button>
-        </div>
+        <h3 className="font-semibold text-[#1A312C] mb-4 flex items-center gap-2">
+          <FontAwesomeIcon icon={faUsers} className="text-[#89D7B7]" />
+          Participants ({participants.length})
+        </h3>
         
-        {!chatSummary ? (
-          <p className="text-[#1A312C]/40 text-center py-8">
-            No chat activity yet. Participants haven't used the AI chat.
-          </p>
+        {participants.length === 0 ? (
+          <p className="text-[#1A312C]/40 text-center py-8">No participants yet.</p>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center gap-4 text-sm text-[#1A312C]/50">
-              <span>💬 Total Messages: {chatSummary.total_messages || 0}</span>
-              <span>👤 Participants: {chatSummary.participants || 0}</span>
-            </div>
-            <div className="p-4 bg-[#428475]/5 rounded-lg border border-[#428475]/10">
-              <div className="whitespace-pre-wrap text-[#1A312C]/80 text-sm leading-relaxed">
-                {chatSummary.summary || 'No summary available. Click "Generate Summary" to analyze chats.'}
+            {participants.map((p, index) => (
+              <div key={index} className="border border-[#428475]/10 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => {
+                    if (selectedParticipant === p.token) {
+                      setSelectedParticipant(null);
+                      setParticipantAnalysis(null);
+                    } else {
+                      handleAnalyzeParticipant(p.token);
+                    }
+                  }}
+                  className="w-full p-4 flex items-center justify-between hover:bg-[#428475]/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-[#428475] flex items-center justify-center text-white text-sm font-bold">
+                      {p.token.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-[#1A312C]">
+                        Participant {index + 1}
+                      </p>
+                      <p className="text-xs text-[#1A312C]/40">
+                        {p.responseCount} responses · {p.chats.length} messages
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedParticipant === p.token && analyzing && (
+                      <span className="text-xs text-[#428475] animate-pulse">Analyzing...</span>
+                    )}
+                    <FontAwesomeIcon 
+                      icon={selectedParticipant === p.token ? faChevronUp : faChevronDown} 
+                      className="text-[#428475]"
+                    />
+                  </div>
+                </button>
+                
+                {/* Participant Analysis */}
+                {selectedParticipant === p.token && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="p-4 border-t border-[#428475]/10 bg-[#428475]/5"
+                  >
+                    {analyzing ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-4 border-[#428475] border-t-transparent mx-auto" />
+                        <p className="text-sm text-[#1A312C]/60 mt-2">Analyzing participant...</p>
+                      </div>
+                    ) : participantAnalysis ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <FontAwesomeIcon icon={faUserMd} className="text-[#89D7B7]" />
+                          <h4 className="font-semibold text-[#1A312C]">Individual Psychological Profile</h4>
+                        </div>
+                        <div className="prose prose-sm max-w-none">
+                          <div className="whitespace-pre-wrap text-[#1A312C]/80 text-sm leading-relaxed">
+                            {participantAnalysis.analysis}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[#1A312C]/40 text-center py-4">Click to analyze this participant</p>
+                    )}
+                  </motion.div>
+                )}
               </div>
-            </div>
+            ))}
           </div>
         )}
       </div>

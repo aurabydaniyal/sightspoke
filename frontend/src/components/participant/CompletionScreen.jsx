@@ -149,7 +149,7 @@ const CompletionScreen = () => {
 
                 <h1 className="text-2xl font-bold text-[#FFF4E1] mb-2">🎉 Complete!</h1>
                 <p className="text-[#FFF4E1]/60 text-sm mb-4">
-                  Thank you for completing the quiz. Your responses have been recorded.
+                  Thank you for completing the survey. Your responses have been recorded.
                 </p>
 
                 <button
@@ -157,7 +157,7 @@ const CompletionScreen = () => {
                   className="w-full justify-center py-2.5 text-sm bg-[#428475] text-white font-medium rounded-lg hover:bg-[#89D7B7] hover:text-[#1A312C] transition-all duration-300 shadow-lg shadow-[#428475]/30 flex items-center justify-center"
                 >
                   <FontAwesomeIcon icon={faHome} className="mr-2" />
-                  Take Another Quiz
+                  Return Home
                 </button>
               </div>
             }
@@ -219,12 +219,12 @@ const CompletionScreen = () => {
 
                     <h3 className="text-lg sm:text-xl font-bold text-[#FFF4E1] mb-2">✅ Response Submitted!</h3>
                     <p className="text-[#FFF4E1]/60 text-xs sm:text-sm leading-relaxed">
-                      Thank you for completing the quiz. 
+                      Thank you for completing the Survey. 
                       <br />
                       Your responses have been successfully recorded.
                     </p>
                     <p className="text-[#89D7B7] text-[10px] sm:text-xs mt-3">
-                      💡 You can now close this popup.
+                      💡 You can now close this Survey.
                     </p>
 
                     <button

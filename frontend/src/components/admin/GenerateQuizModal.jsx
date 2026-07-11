@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faTimes, faWandMagicSparkles, faSpinner, 
-  faArrowRight, faInfoCircle, faImage
+  faArrowRight, faInfoCircle, faBrain,
+  faUserMd, faImage
 } from '@fortawesome/free-solid-svg-icons';
 import { adminApi } from '../../api/axiosConfig';
 import { useAlert } from '../common/CustomAlert';
@@ -17,17 +18,16 @@ const GenerateQuizModal = ({ isOpen, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [generatedQuiz, setGeneratedQuiz] = useState(null);
 
-  // ✅ Page options: 3 to 6
+  // ✅ Page options: 3 to 6 (as backend supports)
   const pageOptions = [3, 4, 5, 6];
 
   const handleGenerate = async () => {
-    // ✅ Description is now mandatory
     if (!topic.trim()) {
-      warning('Please enter a quiz topic');
+      warning('Please enter a survey topic');
       return;
     }
     if (!description.trim()) {
-      warning('Please enter a description (used for AI Overview)');
+      warning('Please enter a description for psychological context');
       return;
     }
 
@@ -40,16 +40,16 @@ const GenerateQuizModal = ({ isOpen, onClose, onSuccess }) => {
       });
       
       setGeneratedQuiz(response.data);
-      success('Quiz generated successfully! 🎉');
+      success('Psychological survey generated successfully! 🧠');
       
       setTimeout(() => {
         onSuccess(response.data);
       }, 1500);
       
     } catch (err) {
-      console.error('❌ Generate quiz error:', err);
-      const errorMsg = err.response?.data?.detail || err.message || 'Failed to generate quiz';
-      error(typeof errorMsg === 'string' ? errorMsg : 'Failed to generate quiz');
+      console.error('❌ Generate error:', err);
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to generate survey';
+      error(typeof errorMsg === 'string' ? errorMsg : 'Failed to generate survey');
     } finally {
       setLoading(false);
     }
@@ -108,26 +108,28 @@ const GenerateQuizModal = ({ isOpen, onClose, onSuccess }) => {
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#428475]/20 flex items-center justify-center flex-shrink-0">
-                    <FontAwesomeIcon icon={faWandMagicSparkles} className="text-[#89D7B7] text-lg sm:text-xl" />
+                    <FontAwesomeIcon icon={faBrain} className="text-[#89D7B7] text-lg sm:text-xl" />
                   </div>
                   <div>
-                    <h2 className="text-lg sm:text-xl font-bold text-[#FFF4E1]">Generate Quiz with AI</h2>
+                    <h2 className="text-lg sm:text-xl font-bold text-[#FFF4E1]">
+                      Generate Survey
+                    </h2>
                     <p className="text-xs sm:text-sm text-[#FFF4E1]/50">
-                      Let AI create a complete quiz for you
+                      AI creates survey questions with psychological context
                     </p>
                   </div>
                 </div>
 
                 {/* Form */}
                 <div className="space-y-4">
-                  {/* Topic - Required */}
+                  {/* Topic */}
                   <div>
                     <label className="block text-sm font-medium text-[#FFF4E1]/70 mb-1">
-                      Quiz Topic <span className="text-red-400">*</span>
+                      Survey Topic <span className="text-red-400">*</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g., Fashion Preferences"
+                      placeholder="Enter survey topic..."
                       value={topic}
                       onChange={(e) => setTopic(e.target.value)}
                       disabled={loading}
@@ -135,14 +137,14 @@ const GenerateQuizModal = ({ isOpen, onClose, onSuccess }) => {
                     />
                   </div>
 
-                  {/* Description - Now Required */}
+                  {/* Description */}
                   <div>
                     <label className="block text-sm font-medium text-[#FFF4E1]/70 mb-1">
                       Description <span className="text-red-400">*</span>
-                      <span className="text-[#FFF4E1]/30 text-xs ml-1">(used for AI Overview)</span>
+                      <span className="text-[#FFF4E1]/30 text-xs ml-1">(psychological context)</span>
                     </label>
                     <textarea
-                      placeholder="Describe what this quiz is about..."
+                      placeholder="Describe the psychological aspects this survey measures..."
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       disabled={loading}
@@ -150,11 +152,11 @@ const GenerateQuizModal = ({ isOpen, onClose, onSuccess }) => {
                       className="w-full bg-[#FFF4E1]/10 rounded-xl px-4 py-3 text-[#FFF4E1] placeholder-[#FFF4E1]/30 focus:outline-none focus:ring-2 focus:ring-[#428475] resize-none disabled:opacity-50"
                     />
                     <p className="text-xs text-[#FFF4E1]/30 mt-1">
-                      💡 This will be auto-filled as AI Overview for the quiz
+                      💡 This description helps AI generate psychologically relevant images
                     </p>
                   </div>
 
-                  {/* Page Count - 2 to 6 */}
+                  {/* Page Count */}
                   <div>
                     <label className="block text-sm font-medium text-[#FFF4E1]/70 mb-1">
                       Number of Pages <span className="text-red-400">*</span>
@@ -180,7 +182,7 @@ const GenerateQuizModal = ({ isOpen, onClose, onSuccess }) => {
                     </div>
                     <p className="text-xs text-[#FFF4E1]/30 mt-2 flex items-center gap-1">
                       <FontAwesomeIcon icon={faInfoCircle} />
-                      Each page will have 3 images By Default
+                      Each page will have 2 psychologically-themed images
                     </p>
                   </div>
 
@@ -193,16 +195,24 @@ const GenerateQuizModal = ({ isOpen, onClose, onSuccess }) => {
                     {loading ? (
                       <>
                         <FontAwesomeIcon icon={faSpinner} className="animate-spin mr-2" />
-                        Generating Quiz...
+                        Generating Survey...
                       </>
                     ) : (
                       <>
-                        Generate Quiz
+                        <FontAwesomeIcon icon={faWandMagicSparkles} className="mr-2" />
+                        Generate Survey
                         <FontAwesomeIcon icon={faArrowRight} className="ml-2" />
                       </>
                     )}
                   </button>
+
                   {/* Info */}
+                  <div className="flex items-center gap-2 p-3 bg-[#428475]/10 rounded-xl border border-[#428475]/20">
+                    <FontAwesomeIcon icon={faUserMd} className="text-[#89D7B7] text-sm flex-shrink-0" />
+                    <p className="text-xs text-[#FFF4E1]/50">
+                      Images are generated like <span className="text-[#89D7B7]">Psychological context</span> for expert analysis
+                    </p>
+                  </div>
                 </div>
               </div>
             </motion.div>
