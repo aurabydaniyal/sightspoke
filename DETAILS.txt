@@ -1,0 +1,571 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║                         SIGHTSPOKE v2.0                                       ║
+║                AI-Powered Psychological Survey Platform                       ║
+║                                                                               ║
+║                    Complete Setup Guide                                       ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+TABLE OF CONTENTS
+═══════════════════════════════════════════════════════════════════════════════════
+
+1. SYSTEM REQUIREMENTS
+2. PROJECT STRUCTURE
+3. DATABASE SETUP
+4. BACKEND SETUP (FastAPI)
+5. FRONTEND SETUP (React)
+6. ENVIRONMENT VARIABLES
+7. API KEYS & SERVICES
+8. RUNNING THE APPLICATION
+9. TROUBLESHOOTING
+10. DEPLOYMENT
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+1. SYSTEM REQUIREMENTS
+═══════════════════════════════════════════════════════════════════════════════════
+
+Minimum Requirements:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Component          │ Version      │ Recommended  │                              │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Python             │ 3.12+        │ 3.14         │                              │
+│ Node.js            │ 18+          │ 20+          │                              │
+│ PostgreSQL         │ 14+          │ 17           │                              │
+│ Git                │ 2.30+        │ Latest       │                              │
+│ RAM                │ 4GB          │ 8GB+         │                              │
+│ Storage            │ 2GB          │ 10GB+        │                              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Operating Systems:
+  ✓ Windows 10/11 (PowerShell / Command Prompt)
+  ✓ macOS 12+ (Terminal)
+  ✓ Linux (Ubuntu 20.04+, Debian 11+)
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+2. PROJECT STRUCTURE
+═══════════════════════════════════════════════════════════════════════════════════
+
+sightspoke/
+├── backend/
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py                 # FastAPI entry point
+│   │   ├── config.py               # Configuration settings
+│   │   ├── database.py             # Database connection
+│   │   ├── api/
+│   │   │   └── routes/
+│   │   │       ├── admin.py        # Admin endpoints
+│   │   │       ├── participant.py  # Participant endpoints
+│   │   │       └── st_routes.py    # Settings endpoints
+│   │   ├── ai/
+│   │   │   ├── analyzer.py         # AI analysis logic
+│   │   │   ├── groq_client.py      # GROQ API client
+│   │   │   ├── quiz_generator.py   # AI quiz generator
+│   │   │   ├── sd_client.py        # Stable Diffusion client
+│   │   │   ├── router.py           # AI routes
+│   │   │   └── schemas.py          # Pydantic schemas
+│   │   ├── core/
+│   │   │   └── security.py         # JWT, hashing, tokens
+│   │   ├── models/
+│   │   │   ├── admin.py
+│   │   │   ├── quiz.py
+│   │   │   ├── image.py
+│   │   │   ├── token.py
+│   │   │   ├── response.py
+│   │   │   ├── ai_insight.py
+│   │   │   └── participant_chat_log.py
+│   │   ├── schemas/
+│   │   │   ├── admin.py
+│   │   │   ├── quiz.py
+│   │   │   └── response.py
+│   │   └── services/
+│   │       └── auth_service.py
+│   ├── static/
+│   │   └── uploads/
+│   │       └── images/
+│   ├── venv/                      # Python virtual environment
+│   ├── .env                       # Environment variables
+│   ├── requirements.txt           # Python dependencies
+│   └── run.py                     # Startup script
+│
+├── frontend/
+│   ├── public/
+│   │   └── index.html
+│   ├── src/
+│   │   ├── api/
+│   │   │   ├── axiosConfig.js
+│   │   │   ├── adminApi.js
+│   │   │   ├── participantApi.js
+│   │   │   ├── aiApi.js
+│   │   │   └── stApi.js
+│   │   ├── components/
+│   │   │   ├── admin/
+│   │   │   ├── ai/
+│   │   │   ├── participant/
+│   │   │   └── common/
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx
+│   │   ├── pages/
+│   │   ├── styles/
+│   │   ├── utils/
+│   │   ├── App.jsx
+│   │   └── index.js
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── .env
+│
+└── database/
+    ├── schema.sql                 # Database schema
+    └── seed.sql                   # Sample data (optional)
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+3. DATABASE SETUP
+═══════════════════════════════════════════════════════════════════════════════════
+
+3.1 Install PostgreSQL 17
+
+Windows:
+  1. Download installer from: https://www.postgresql.org/download/windows/
+  2. Run installer, keep default settings
+  3. Remember the password you set for 'postgres' user
+
+macOS:
+  brew install postgresql@17
+  brew services start postgresql@17
+
+Ubuntu/Debian:
+  sudo apt update
+  sudo apt install postgresql-17 postgresql-contrib-17
+  sudo systemctl start postgresql
+
+3.2 Create Database
+
+Open terminal/command prompt:
+
+# Windows (Command Prompt)
+psql -U postgres -c "CREATE DATABASE sightspoke;"
+
+# PowerShell (if psql in PATH)
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -c "CREATE DATABASE sightspoke;"
+
+# macOS/Linux
+createdb sightspoke
+
+3.3 Run Schema
+
+# Using psql
+psql -U postgres -d sightspoke -f database/schema.sql
+
+# OR using pgAdmin
+# 1. Open pgAdmin
+# 2. Connect to PostgreSQL
+# 3. Select 'sightspoke' database
+# 4. Open Query Tool (Tools → Query Tool)
+# 5. Paste and execute schema.sql
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+4. BACKEND SETUP (FastAPI)
+═══════════════════════════════════════════════════════════════════════════════════
+
+4.1 Create Virtual Environment
+
+# Navigate to backend
+cd backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate (Windows)
+venv\Scripts\activate
+
+# Activate (macOS/Linux)
+source venv/bin/activate
+
+4.2 Install Dependencies
+
+Create requirements.txt:
+
+─────────────────────────────────────────────────────────────────────────────────
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+python-dotenv==1.0.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+pydantic==2.5.0
+pydantic-settings==2.1.0
+aiofiles==23.2.1
+httpx==0.25.2
+huggingface-hub==0.19.4
+─────────────────────────────────────────────────────────────────────────────────
+
+# Install
+pip install -r requirements.txt
+
+4.3 Create .env File
+
+Create backend/app/.env:
+
+─────────────────────────────────────────────────────────────────────────────────
+# ============================================================
+# DATABASE CONFIGURATION
+# ============================================================
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=sightspoke
+DB_USER=postgres
+DB_PASSWORD=your_password_here
+
+# ============================================================
+# SECURITY CONFIGURATION
+# ============================================================
+SECRET_KEY=your-super-secret-key-change-in-production
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin123
+RECOVERY_SECRET_KEY=sightspoke-recovery-2026
+
+# ============================================================
+# AI / GROQ API KEY
+# ============================================================
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# ============================================================
+# HUGGING FACE API KEY (Image Generation)
+# ============================================================
+HF_API_KEY=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# ============================================================
+# PEXELS API KEY (Fallback Images - Optional)
+# ============================================================
+PEXELS_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# ============================================================
+# STABLE DIFFUSION MODEL
+# ============================================================
+SD_MODEL=black-forest-labs/FLUX.1-schnell
+
+# ============================================================
+# TOKEN SETTINGS
+# ============================================================
+TOKEN_EXPIRY_DAYS=7
+
+# ============================================================
+# CORS ALLOWED ORIGINS
+# ============================================================
+ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+─────────────────────────────────────────────────────────────────────────────────
+
+4.4 Start Backend
+
+python run.py
+
+# OR
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+Backend will run at: http://localhost:8000
+API Documentation: http://localhost:8000/docs
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+5. FRONTEND SETUP (React)
+═══════════════════════════════════════════════════════════════════════════════════
+
+5.1 Install Dependencies
+
+# Navigate to frontend
+cd frontend
+
+# Install Node dependencies
+npm install
+
+5.2 Create .env File
+
+Create frontend/.env:
+
+─────────────────────────────────────────────────────────────────────────────────
+REACT_APP_API_URL=http://localhost:8000
+REACT_APP_VERSION=1.0.0
+─────────────────────────────────────────────────────────────────────────────────
+
+5.3 Install Additional Packages
+
+# Core dependencies
+npm install axios react-router-dom framer-motion
+
+# UI & Icons
+npm install @fortawesome/fontawesome-svg-core @fortawesome/free-solid-svg-icons @fortawesome/react-fontawesome
+npm install tailwindcss @headlessui/react @heroicons/react lucide-react react-icons
+
+# Charts & Data
+npm install chart.js react-chartjs-2
+
+# Forms & Notifications
+npm install react-hook-form react-hot-toast
+
+# File Upload
+npm install react-dropzone
+
+# Utilities
+npm install date-fns
+
+# AI Image Generation (for frontend testing)
+npm install ogl
+
+5.4 Start Frontend
+
+npm start
+
+Frontend will run at: http://localhost:3000
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+6. ENVIRONMENT VARIABLES SUMMARY
+═══════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Variable               │ Required │ Description                                 │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ DB_HOST                │ ✅        │ PostgreSQL host (localhost)               │
+│ DB_PORT                │ ✅        │ PostgreSQL port (5432)                    │
+│ DB_NAME                │ ✅        │ Database name (sightspoke)                │
+│ DB_USER                │ ✅        │ Database user (postgres)                  │
+│ DB_PASSWORD            │ ✅        │ Database password                         │
+│ SECRET_KEY             │ ✅        │ JWT secret key (change in production)     │
+│ ADMIN_USERNAME         │ ✅        │ Admin username (default: admin)           │
+│ ADMIN_PASSWORD         │ ✅        │ Admin password (default: admin123)        │
+│ GROQ_API_KEY           │ ✅        │ Groq API key for AI                       │
+│ HF_API_KEY             │ ✅        │ Hugging Face API key for image generation │
+│ PEXELS_API_KEY         │ ⬜        │ Pexels API key (fallback images)          │
+│ RECOVERY_SECRET_KEY    │ ✅        │ Emergency password reset key              │
+│ TOKEN_EXPIRY_DAYS      │ ⬜        │ Participant token expiry (default: 7)     │
+│ ALLOWED_ORIGINS        │ ⬜        │ CORS allowed origins (comma separated)    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+7. API KEYS & SERVICES
+═══════════════════════════════════════════════════════════════════════════════════
+
+7.1 GROQ API Key (Required for AI Analysis)
+
+1. Go to: https://console.groq.com/
+2. Sign up / Log in
+3. Go to: https://console.groq.com/keys
+4. Click "Create API Key"
+5. Name it: "sightspoke-ai"
+6. Copy the key (starts with gsk_...)
+7. Add to .env: GROQ_API_KEY=gsk_...
+
+Free Tier: 30 requests per minute, unlimited hours
+
+7.2 Hugging Face API Key (Required for Image Generation)
+
+1. Go to: https://huggingface.co/join
+2. Sign up (email + password)
+3. Go to: https://huggingface.co/settings/tokens
+4. Click "Create token"
+5. Select "Fine-grained" type
+6. Enable "Inference Providers" permission
+7. Copy token (starts with hf_...)
+8. Add to .env: HF_API_KEY=hf_...
+
+Free Tier: 30-60 requests per minute, unlimited hours
+
+7.3 Pexels API Key (Optional - Fallback Images)
+
+1. Go to: https://www.pexels.com/api/
+2. Sign up
+3. Go to: https://www.pexels.com/api/new/
+4. Click "Create API Key"
+5. Copy the key
+6. Add to .env: PEXELS_API_KEY=...
+
+Free Tier: 200 requests per hour, 2000 per day
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+8. RUNNING THE APPLICATION
+═══════════════════════════════════════════════════════════════════════════════════
+
+8.1 Development Mode
+
+Terminal 1 - Backend:
+─────────────────────────────────────────────────────────────────────────────────
+cd backend/app
+venv\Scripts\activate  (Windows) / source venv/bin/activate (macOS/Linux)
+python run.py
+─────────────────────────────────────────────────────────────────────────────────
+
+Terminal 2 - Frontend:
+─────────────────────────────────────────────────────────────────────────────────
+cd frontend
+npm start
+─────────────────────────────────────────────────────────────────────────────────
+
+Access:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+8.2 Production Build
+
+Backend:
+─────────────────────────────────────────────────────────────────────────────────
+cd backend/app
+venv\Scripts\activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+─────────────────────────────────────────────────────────────────────────────────
+
+Frontend:
+─────────────────────────────────────────────────────────────────────────────────
+cd frontend
+npm run build
+# Serve the build folder with any static server
+npx serve -s build
+─────────────────────────────────────────────────────────────────────────────────
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+9. TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════════
+
+9.1 Database Connection Issues
+
+Error: "could not connect to server"
+
+Solution:
+1. Check PostgreSQL is running:
+   - Windows: services.msc → find "postgresql"
+   - macOS: brew services list
+   - Linux: sudo systemctl status postgresql
+
+2. Verify credentials in .env
+
+3. Test connection:
+   psql -U postgres -d sightspoke -c "SELECT 1"
+
+9.2 Python Module Not Found
+
+Error: "ModuleNotFoundError: No module named 'xxx'"
+
+Solution:
+─────────────────────────────────────────────────────────────────────────────────
+pip install xxx
+# OR reinstall all:
+pip install -r requirements.txt
+─────────────────────────────────────────────────────────────────────────────────
+
+9.3 Node Package Issues
+
+Error: "Module not found" in React
+
+Solution:
+─────────────────────────────────────────────────────────────────────────────────
+rm -rf node_modules package-lock.json
+npm install
+─────────────────────────────────────────────────────────────────────────────────
+
+9.4 CORS Error
+
+Error: "Access-Control-Allow-Origin" header is missing
+
+Solution:
+1. Check ALLOWED_ORIGINS in .env
+2. Include your frontend URL (e.g., http://localhost:3000)
+3. Restart backend
+
+9.5 API Key Issues
+
+Error: "API key not found" or 401/403 errors
+
+Solution:
+1. Verify API key is correctly copied (no extra spaces)
+2. Check if key has required permissions
+3. For Hugging Face: ensure "Inference Providers" is enabled
+
+9.6 Image Generation Fails
+
+Error: "Model not found" or timeout
+
+Solution:
+1. Check HF_API_KEY is valid
+2. Verify SD_MODEL in .env
+3. Try fallback model: stabilityai/stable-diffusion-xl-base-1.0
+4. Accept gated models: go to huggingface.co/model-name and click "Agree"
+
+
+═══════════════════════════════════════════════════════════════════════════════════
+10. DEPLOYMENT
+═══════════════════════════════════════════════════════════════════════════════════
+
+10.1 Docker Deployment
+
+Create Dockerfile for Backend:
+─────────────────────────────────────────────────────────────────────────────────
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+─────────────────────────────────────────────────────────────────────────────────
+
+Create Dockerfile for Frontend:
+─────────────────────────────────────────────────────────────────────────────────
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY package*.json .
+RUN npm install
+COPY . .
+RUN npm run build
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+─────────────────────────────────────────────────────────────────────────────────
+
+Docker Compose:
+─────────────────────────────────────────────────────────────────────────────────
+version: '3.8'
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: sightspoke
+      POSTGRES_PASSWORD: postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@db:5432/sightspoke
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./backend/static:/app/static
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres_data:
+─────────────────────────────────────────────────────────────────────────────────
