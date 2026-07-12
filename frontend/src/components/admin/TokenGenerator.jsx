@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLink, faCopy, faCheck, faSync, faPlus, faMinus, faBolt, faLock, faUnlock, faClipboard, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faLink, faCopy, faCheck, faSync, faPlus, faMinus, 
+  faBolt, faLock, faUnlock, faClipboard
+} from '@fortawesome/free-solid-svg-icons';
 import { adminApi } from '../../api/axiosConfig';
 import { useAlert } from '../common/CustomAlert';
 
@@ -17,10 +20,8 @@ const TokenGenerator = () => {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
-  const [isLocked, setIsLocked] = useState(true);
-  const [showQueue, setShowQueue] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
 
-  // Load tokens on mount
   useEffect(() => {
     loadTokens();
   }, [quizId]);
@@ -30,10 +31,9 @@ const TokenGenerator = () => {
     try {
       const response = await adminApi.get(`/tokens/${quizId}`);
       const tokenData = response.data || [];
-      // Filter: only show unused, non-expired tokens
-      const available = tokenData.filter(t => !t.is_used && !t.is_expired);
+      // ✅ Only filter used tokens - NOT expired
+      const available = tokenData.filter(t => !t.is_used);
       setTokens(available);
-      setShowQueue(available.length > 0);
     } catch (err) {
       console.error('Failed to load tokens:', err);
     } finally {
@@ -63,7 +63,6 @@ const TokenGenerator = () => {
       });
       const newTokens = response.data.links || [];
       setTokens([...tokens, ...newTokens]);
-      setShowQueue(true);
       success(`${count} tokens generated!`);
     } catch (err) {
       error('Failed to generate tokens');
@@ -73,26 +72,21 @@ const TokenGenerator = () => {
     }
   };
 
+  // ✅ FIX: Copy token WITHOUT marking as used
   const copyToken = async (token, index) => {
     try {
       await navigator.clipboard.writeText(token.url);
       setCopiedIndex(index);
       
-      // Remove from queue (pop from front)
+      // ✅ Remove from queue (pop) but DON'T mark as used
       const updated = [...tokens];
       updated.splice(index, 1);
       setTokens(updated);
       
-      // Mark as used in database
-      await adminApi.put(`/tokens/${token.token}/use`);
+      // ❌ REMOVED: await adminApi.put(`/tokens/${token.token}/use`);
       
-      success('Token copied and used!');
+      success('Token copied and ready to use!');
       setTimeout(() => setCopiedIndex(null), 2000);
-      
-      // Hide queue if empty
-      if (updated.length === 0) {
-        setShowQueue(false);
-      }
     } catch (err) {
       error('Failed to copy token');
     }
@@ -108,14 +102,10 @@ const TokenGenerator = () => {
       const allUrls = tokens.map(t => t.url).join('\n');
       await navigator.clipboard.writeText(allUrls);
       
-      // Mark all as used
-      for (const token of tokens) {
-        await adminApi.put(`/tokens/${token.token}/use`);
-      }
+      // ✅ Remove all from queue but DON'T mark as used
+      setTokens([]);
       
       success(`Copied ${tokens.length} tokens!`);
-      setTokens([]);
-      setShowQueue(false);
     } catch (err) {
       error('Failed to copy all tokens');
     }
@@ -143,13 +133,13 @@ const TokenGenerator = () => {
           <h2 className="text-2xl font-bold text-[#1A312C]">Token Management</h2>
           <p className="text-[#1A312C]/40 text-sm">Quiz ID: {quizId}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <span className="text-sm text-[#1A312C]/40">
-            {tokens.length} tokens available
+            {tokens.length} available
           </span>
           <button
             onClick={() => setIsLocked(!isLocked)}
-            className={`btn-glass !py-1.5 !px-3 text-sm ${
+            className={`btn-glass !py-1.5 !px-3 text-sm flex items-center gap-2 ${
               isLocked ? 'text-[#428475]' : 'text-[#89D7B7]'
             }`}
           >
@@ -227,16 +217,15 @@ const TokenGenerator = () => {
         </button>
       </div>
 
-      {/* ✅ QUEUE BOX - Only shows when tokens exist */}
+      {/* Queue Box */}
       <AnimatePresence>
-        {showQueue && tokens.length > 0 && (
+        {tokens.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="glass-card p-6 border-2 border-[#428475]/30"
+            className="glass-card p-6 border-2 border-[#89D7B7]/30"
           >
-            {/* Queue Header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-[#428475]/20 flex items-center justify-center">
@@ -250,20 +239,18 @@ const TokenGenerator = () => {
                 </div>
               </div>
               
-              {/* Copy All Button */}
               <button
                 onClick={copyAllTokens}
-                disabled={isLocked}
+                disabled={isLocked || tokens.length === 0}
                 className={`btn-glass !py-1.5 !px-3 text-sm flex items-center gap-2 ${
-                  isLocked ? 'opacity-50 cursor-not-allowed' : ''
+                  isLocked || tokens.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 <FontAwesomeIcon icon={faClipboard} />
-                Copy All
+                Copy All ({tokens.length})
               </button>
             </div>
 
-            {/* Locked State Overlay */}
             {isLocked ? (
               <div className="text-center py-8 text-[#1A312C]/40">
                 <FontAwesomeIcon icon={faLock} className="text-4xl mb-3 block" />
@@ -271,7 +258,6 @@ const TokenGenerator = () => {
                 <p className="text-xs">Click the lock button above to access tokens</p>
               </div>
             ) : (
-              /* Queue Items - Stack style (LIFO) */
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {tokens.map((token, index) => (
                   <motion.div
@@ -281,22 +267,18 @@ const TokenGenerator = () => {
                     transition={{ delay: index * 0.05 }}
                     className="flex items-center gap-3 p-3 rounded-lg bg-[#1A312C]/5 hover:bg-[#1A312C]/10 transition-colors border border-[#428475]/10"
                   >
-                    {/* Queue Position */}
                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#428475] text-white text-xs font-bold flex-shrink-0">
                       {index + 1}
                     </div>
                     
-                    {/* Token URL */}
                     <code className="flex-1 text-xs bg-[#FFF4E1] px-3 py-1.5 rounded font-mono truncate">
                       {token.url}
                     </code>
                     
-                    {/* Expiry */}
                     <span className="text-xs text-[#1A312C]/40 whitespace-nowrap">
                       {new Date(token.expires_at).toLocaleDateString()}
                     </span>
                     
-                    {/* Copy Button - Pops from queue */}
                     <button
                       onClick={() => copyToken(token, index)}
                       className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
@@ -313,21 +295,18 @@ const TokenGenerator = () => {
               </div>
             )}
 
-            {/* Queue Footer */}
             <div className="mt-4 pt-3 border-t border-[#428475]/10 flex items-center justify-between text-xs text-[#1A312C]/40">
               <span>
-                {isLocked ? '🔒 Locked' : '🔓 Unlocked'} · {tokens.length} tokens in queue
+                {isLocked ? '🔒 Locked' : '🔓 Unlocked'} · {tokens.length} tokens
               </span>
-              <span>
-                First in, first out
-              </span>
+              <span>First in, first out</span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* No Tokens Message */}
-      {!showQueue && tokens.length === 0 && !loading && (
+      {/* No Tokens */}
+      {tokens.length === 0 && !loading && (
         <div className="glass-card p-8 text-center border-2 border-dashed border-[#428475]/20">
           <FontAwesomeIcon icon={faLink} className="text-4xl text-[#428475]/30 mb-3" />
           <p className="text-[#1A312C]/50">No tokens available</p>
